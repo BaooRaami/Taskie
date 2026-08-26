@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Taskie</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <aside class="sidebar">
+      <div class="sidebar-top">
+        <div class="sidebar-brand">
+          <div class="brand-grid">
+            <span class="brand-letter">T</span>
+            <span class="brand-letter">A</span>
+            <span class="brand-letter">S</span>
+            <span class="brand-letter">K</span>
+            <span class="brand-letter">I</span>
+            <span class="brand-letter">E</span>
+          </div>
+        </div>
+        <button class="sidebar-button" :class="{active: page === 'dashboard'}" @click="page = 'dashboard'" aria-label="Dashboard" title="Dashboard">
+          <span class="sidebar-icon" v-html="icons.dashboard"></span>
+        </button>
+
+        <button class="sidebar-button" :class="{active: page === 'tasks'}" @click="page = 'tasks'" aria-label="Tasks" title="Tasks List">
+          <span class="sidebar-icon" v-html="icons.tasks"></span>
+        </button>
+
+        <button class="sidebar-button" :class="{active: page === 'repeat-tasks'}" @click="page = 'repeat-tasks'" aria-label="Repeat Tasks" title="Repeat Tasks">
+          <span class="sidebar-icon" v-html="icons.repeat"></span>
+        </button>
+      </div>
+
+      <div class="sidebar-bottom">
+        <button class="sidebar-button" :class="{active: showSettings}" @click="openSettings" aria-label="Settings" title="Settings">
+          <span class="sidebar-icon" v-html="icons.settings"></span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- ========== DASHBOARD PAGE ========== -->
+    <div v-if="page === 'dashboard'" class="dashboard-page">
+      <!-- Stat Boxes -->
+      <div class="stat-boxes" :class="{ 'three-col': !trackInProgress }">
+        <div class="stat-box stat-all" @click="page = 'tasks'; filterStatus = ''">
+          <span class="stat-count">{{ statusCounts.all }}</span>
+          <span class="stat-label">All</span>
+        </div>
+        <div class="stat-box stat-not-started" @click="page = 'tasks'; filterStatus = 'not-started'">
+          <span class="stat-count">{{ statusCounts['not-started'] }}</span>
+          <span class="stat-label">Not Started</span>
+        </div>
+        <div v-if="trackInProgress" class="stat-box stat-in-progress" @click="page = 'tasks'; filterStatus = 'in-progress'">
+          <span class="stat-count">{{ statusCounts['in-progress'] }}</span>
+          <span class="stat-label">In Progress</span>
+        </div>
+        <div class="stat-box stat-finished" @click="page = 'tasks'; filterStatus = 'finished'">
+          <span class="stat-count">{{ statusCounts.finished }}</span>
+          <span class="stat-label">Finished</span>
+        </div>
+      </div>
+
+      <!-- Dashboard Lists -->
+      <div class="dashboard-lists" :class="{ 'auto-fit': hideEmptyLists || hideCustomList }">
+        <div v-if="hideEmptyLists && allDashboardEmpty" class="dashboard-empty">
+          <div class="dashboard-empty-icon" v-html="icons.tasks"></div>
+          <div class="dashboard-empty-title">All caught up!</div>
+          <div class="dashboard-empty-sub">No tasks are due right now.</div>
+        </div>
+        <template v-for="sec in dashboardSections" :key="sec.key">
+          <div v-if="!(hideEmptyLists && !dashboardGroups[sec.key].length)" :class="['list-box', 'list-box-' + sec.key]">
+            <div :class="['list-box-header', sec.key]">
+              <span class="list-box-title">{{sec.title}}</span>
+              <span class="list-box-count">{{dashboardGroups[sec.key].length}}</span>
+            </div>
+            <div class="list-box-body">
+              <div v-if="!dashboardGroups[sec.key].length" class="list-empty">{{sec.emptyMsg}}</div>
+              <div v-for="task in dashboardGroups[sec.key]" :key="task.id" :class="['list-task-row', sec.key + '-task', { 'slide-out': slidingTaskIds[task.id], 'repeat-task-row': isRepeatInstance(task) }]" @click="goToTask(task)">
+                <input type="checkbox" @click.stop @change="quickFinish(task)">
+                <span class="list-task-title"><span v-if="isRepeatInstance(task)" class="repeat-badge" v-html="icons.repeat" title="Repeat task"></span>{{task.title}}</span>
+                <div v-if="sec.showDate" class="list-task-meta">
+                  <span :class="['list-task-date', sec.dateClass]">{{formatDate(task.dueDate)}}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- Custom -->
+        <div v-if="!hideCustomList" class="list-box list-box-custom">
+          <div class="list-box-header custom">
+            <span class="list-box-title">Custom</span>
+            <span class="list-box-count">{{dashboardGroups.custom.length}}</span>
+          </div>
+          <div class="custom-date-row">
+            <input type="date" v-model="customDateStart" @change="saveCustomDates">
+            <span>to</span>
+            <input type="date" v-model="customDateEnd" @change="saveCustomDates">
+          </div>
+          <div class="list-box-body">
+            <div v-if="!dashboardGroups.custom.length" class="list-empty">No tasks in range</div>
+            <div v-for="task in dashboardGroups.custom" :key="task.id" class="list-task-row custom-task" :class="{ 'slide-out': slidingTaskIds[task.id], 'repeat-task-row': isRepeatInstance(task) }" @click="goToTask(task)">
+              <input type="checkbox" @click.stop @change="quickFinish(task)">
+              <span class="list-task-title"><span v-if="isRepeatInstance(task)" class="repeat-badge" v-html="icons.repeat" title="Repeat task"></span>{{task.title}}</span>
+              <div class="list-task-meta">
+                <span class="list-task-date">{{formatDate(task.dueDate)}}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== TASKS PAGE ========== -->
+    <div v-if="page === 'tasks'" class="tasks-page">
+      <!-- Toolbar -->
+      <div class="tasks-toolbar">
+        <div class="quick-add">
+          <span class="toolbar-icon" v-html="icons.add"></span>
+          <input type="text" v-model="quickAddText" placeholder="Type a task and press Enter..." @keyup.enter="quickAdd" @keyup.esc="clearQuickAdd" ref="quickAddInput">
+        </div>
+        <div class="toolbar-search">
+          <span class="toolbar-icon" v-html="icons.search"></span>
+          <input type="text" v-model="searchQuery" placeholder="Search tasks..." ref="searchInput">
+        </div>
+      </div>
+
+      <div class="title-tabs-row">
+        <h2 class="page-title">{{pageTitle}}</h2>
+        <div class="filter-tabs">
+          <button class="filter-tab" :class="{active: filterStatus === ''}" @click="filterStatus = ''">All</button>
+          <button class="filter-tab not-started" :class="{active: filterStatus === 'not-started'}" @click="filterStatus = 'not-started'">Not Started</button>
+          <button v-if="trackInProgress" class="filter-tab in-progress" :class="{active: filterStatus === 'in-progress'}" @click="filterStatus = 'in-progress'">In Progress</button>
+          <button class="filter-tab finished" :class="{active: filterStatus === 'finished'}" @click="filterStatus = 'finished'">Finished</button>
+        </div>
+      </div>
+
+      <!-- Task Table -->
+      <div class="task-table-wrap">
+        <table class="task-table">
+          <thead>
+            <tr>
+              <th class="col-created" :class="sortClass('createdAt')" @click="toggleSort('createdAt')">Created</th>
+              <th class="col-title" :class="sortClass('title')" @click="toggleSort('title')">Task</th>
+              <th class="col-subtasks" :class="sortClass('subtasks')" @click="toggleSort('subtasks')">Subtasks</th>
+              <th class="col-status" :class="sortClass('status')" @click="toggleSort('status')">Status</th>
+              <th class="col-due" :class="sortClass('dueDate')" @click="toggleSort('dueDate')">Due Date</th>
+              <th class="col-actions"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="task in filteredItems" :key="task.id" :class="[task.status, { 'task-highlight': highlightedTaskId === task.id }]" :data-task-id="task.id" ref="taskRows">
+              <td class="cell-created-chip">
+                <button class="chip created-chip" @click="openCreatedEditor(task)">{{formatDate(task.createdAt)}}</button>
+                <div v-if="isCreatedEditing(task.id)" class="chip-popover" @click.stop>
+                  <div class="form-group">
+                    <label>Created Date</label>
+                    <input type="date" v-model="createdEditValue" @blur="saveCreatedEdit(task)">
+                  </div>
+                </div>
+              </td>
+              <!-- Title -->
+              <td class="task-title-cell" @click="startEdit(task, 'title', $event)">
+                <span v-if="!isEditing(task.id, 'title')" class="task-title-text">{{task.title}}</span>
+                <input v-else v-model="editValue" @blur="saveEdit(task, 'title')" @keyup.enter="saveEdit(task, 'title')" @keyup.esc="cancelEdit" class="inline-input" ref="editInput">
+              </td>
+
+              <!-- Subtasks -->
+              <td class="cell-subtasks">
+                <button class="chip subtasks-chip" @click="openSubtaskEditor(task)">{{subtaskChipLabel(task)}}</button>
+                <div v-if="isSubtaskEditing(task.id)" class="chip-popover" @click.stop>
+                  <div class="subtask-form-list">
+                    <div v-for="(st, idx) in subtaskEditForm" :key="st.id" class="subtask-form-item" @click="startSubtaskEdit(st)">
+                      <div class="subtask-check-label">
+                        <input type="checkbox" v-model="st.done" @click.stop>
+                        <span v-if="editingSubtaskId !== st.id" class="subtask-text">{{st.text}}</span>
+                        <input v-else v-model="subtaskEditValue" @blur="saveSubtaskEditInline" @keyup.enter="saveSubtaskEditInline" @keyup.esc="cancelSubtaskEdit" class="subtask-inline-input" ref="subtaskEditInput" @click.stop>
+                      </div>
+                      <button @click.stop="removeSubtaskInline(idx)">&times;</button>
+                    </div>
+                  </div>
+
+                  <div class="subtask-add-row">
+                    <input
+                      type="text"
+                      v-model="newSubtaskText"
+                      @keyup.enter="addSubtaskInline"
+                      placeholder="Add a subtask..."
+                    >
+                    <button class="btn-add-subtask" @click="addSubtaskInline" type="button">Add</button>
+                  </div>
+                  <div class="chip-popover-actions">
+                    <button class="btn-secondary" @click="closeSubtaskEditor" type="button">Cancel</button>
+                    <button class="btn-primary" @click="saveSubtaskEdit(task)" type="button">Save</button>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Status -->
+              <td>
+                <select v-if="trackInProgress" class="status-select-inline" :class="task.status" :value="task.status" @change="changeStatus(task, $event.target.value)">
+                  <option value="not-started">Not Started</option>
+                  <option value="in-progress">In Progress</option>
+                  <option value="finished">Finished</option>
+                </select>
+                <button v-else class="status-select-inline" :class="task.status" @click="changeStatus(task)">
+                  {{statusLabel(task.status)}}
+                </button>
+              </td>
+
+              <!-- Due Date -->
+              <td class="cell-due-chip">
+                <button class="chip due-chip" :class="{overdue: isOverdue(task)}" @click="openDueEditor(task)">{{dueChipLabel(task)}}</button>
+                <div v-if="isDueEditing(task.id)" class="chip-popover" @click.stop>
+                  <div class="form-group">
+                    <label>Due Date</label>
+                    <div class="date-clear-row">
+                      <input type="date" v-model="dueEditForm.dueDate">
+                      <button class="btn-danger" v-if="dueEditForm.dueDate" @click="clearDueDate(task)" type="button">Clear</button>
+                    </div>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Actions -->
+              <td class="cell-actions">
+                <button class="btn-del" @click="deleteTask(task)" v-html="icons.delete"></button>
+              </td>
+            </tr>
+
+            <tr v-if="!filteredItems.length">
+              <td colspan="6" class="empty-row">
+                No tasks found. Use the quick-add bar above to add one.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ========== REPEAT TASKS PAGE ========== -->
+    <div v-if="page === 'repeat-tasks'" class="repeat-tasks-page">
+      <div class="tasks-toolbar">
+        <div class="quick-add" @click="openRepeatAddModal">
+          <span class="toolbar-icon" v-html="icons.add"></span>
+          <input type="text" readonly placeholder="Click to add a repeat task..." ref="repeatQuickAddInput">
+        </div>
+        <div class="toolbar-search">
+          <span class="toolbar-icon" v-html="icons.search"></span>
+          <input type="text" v-model="searchQuery" placeholder="Search repeat tasks..." ref="searchInput">
+        </div>
+      </div>
+
+      <div class="title-tabs-row">
+        <h2 class="page-title">Repeat Tasks</h2>
+      </div>
+
+      <!-- Task Table -->
+      <div class="task-table-wrap">
+        <table class="task-table">
+          <thead>
+            <tr>
+              <th class="col-created" :class="sortClass('createdAt')" @click="toggleSort('createdAt')">Created</th>
+              <th class="col-title" :class="sortClass('title')" @click="toggleSort('title')">Task</th>
+              <th>Instances</th>
+              <th :class="sortClass('frequency')" @click="toggleSort('frequency')">Frequency</th>
+              <th :class="sortClass('endDate')" @click="toggleSort('endDate')">End Date</th>
+              <th class="col-actions"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in filteredItems" :key="item.id" :class="['clickable-row', { 'task-highlight': highlightedTaskId === item.id }]" :data-task-id="item.id" ref="repeatRows">
+              <td class="cell-created-chip">
+                <button class="chip created-chip" @click.stop="openCreatedEditor(item)">{{ formatDate(item.createdAt) }}</button>
+                <div v-if="isCreatedEditing(item.id)" class="chip-popover" @click.stop>
+                  <div class="form-group">
+                    <label>Created Date</label>
+                    <input type="date" v-model="createdEditValue" @blur="saveCreatedEdit(item)">
+                  </div>
+                </div>
+              </td>
+              <td class="task-title-cell" @click="openRepeatEditModal(item)">
+                <span class="task-title-text">{{ item.title }}</span>
+              </td>
+              <td class="cell-subtasks">
+                <button class="chip subtasks-chip" @click.stop="openInstanceEditor(item)">{{ instanceChipLabel(item) }}</button>
+                <div v-if="instanceEditingId === item.id" class="chip-popover" @click.stop>
+                  <div class="instance-form-list">
+                    <div v-for="inst in instanceForm" :key="inst.id" class="instance-form-item" :class="{ finished: inst.checked }">
+                      <div class="instance-check-label">
+                        <input type="checkbox" :checked="inst.checked" @change="toggleInstance(inst)">
+                        <span class="instance-text">{{ formatDate(inst.dueDate) }}</span>
+                      </div>
+                    </div>
+                    <div v-if="!instanceForm.length" class="list-empty">No instances</div>
+                  </div>
+                </div>
+              </td>
+              <td class="cell-subtasks" @click="openRepeatEditModal(item)">
+                <span class="chip subtasks-chip">{{ formatFrequency(item) }}</span>
+              </td>
+              <td class="cell-due-chip" @click="openRepeatEditModal(item)">
+                <span class="chip due-chip">{{ formatEndDate(item) }}</span>
+              </td>
+              <td class="cell-actions">
+                <button class="btn-del" @click.stop="deleteRepeatTask(item)" v-html="icons.delete"></button>
+              </td>
+            </tr>
+
+            <tr v-if="!filteredItems.length">
+              <td colspan="6" class="empty-row">
+                No repeat tasks found. Use the quick-add bar above to add one.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Repeat Add Modal -->
+      <div v-if="showRepeatAddModal" class="modal-backdrop" @click="closeRepeatAddModal">
+        <div class="modal-panel modal-panel-split" @click.stop>
+          <div class="modal-left">
+            <h3 class="modal-title">{{ repeatForm.id ? 'Edit' : 'Add' }} Repeat Task</h3>
+
+          <div class="form-group">
+            <label>Task Title</label>
+            <input type="text" v-model="repeatForm.title" placeholder="Type repeat task title..." ref="repeatTitleInput" :class="{ 'input-error': repeatTitleError }" @input="repeatTitleError = false">
+          </div>
+
+          <div class="form-group">
+            <label>Repeat Mode</label>
+            <div class="filter-tabs filter-tabs-full">
+              <button class="filter-tab" :class="{active: repeatForm.mode === 'days'}" @click="repeatForm.mode = 'days'" type="button">Days</button>
+              <button class="filter-tab" :class="{active: repeatForm.mode === 'week'}" @click="repeatForm.mode = 'week'" type="button">Week</button>
+              <button class="filter-tab" :class="{active: repeatForm.mode === 'date'}" @click="repeatForm.mode = 'date'" type="button">Date</button>
+            </div>
+          </div>
+
+          <!-- Dynamic Mode Options -->
+          <div class="recurrence-options" v-if="repeatForm.mode === 'days'">
+            <div class="form-group form-group-last">
+              <label>Repeat Every (Days)</label>
+              <input type="number" v-model.number="repeatForm.intervalDays" min="1">
+            </div>
+          </div>
+
+          <div class="recurrence-options" v-if="repeatForm.mode === 'week'">
+            <div class="form-group form-group-last">
+              <label>Select Days of Week</label>
+              <div class="chip-group chip-grid-7">
+                <button
+                  v-for="d in weekDaysList"
+                  :key="d.val"
+                  type="button"
+                  class="chip-toggle"
+                  :class="{ active: repeatForm.selectedDays.includes(d.val) }"
+                  @click="toggleInArray(repeatForm.selectedDays, d.val)"
+                >{{ d.label }}</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="recurrence-options" v-if="repeatForm.mode === 'date'">
+            <div class="form-group form-group-last">
+              <label>Select Dates of Month (1 - 31)</label>
+              <div class="chip-group chip-grid-8">
+                <button
+                  v-for="n in 31"
+                  :key="n"
+                  type="button"
+                  class="chip-toggle"
+                  :class="{ active: repeatForm.selectedDates.includes(n), 'span-2': n === 31 }"
+                  @click="toggleInArray(repeatForm.selectedDates, n)"
+                >{{ n === 31 ? '31 / Last' : n }}</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- End Condition -->
+          <div class="form-group form-group-end">
+            <label>End Condition</label>
+            <div class="filter-tabs filter-tabs-full">
+              <button class="filter-tab" :class="{active: repeatForm.endCondition === 'never'}" @click="repeatForm.endCondition = 'never'" type="button">Never</button>
+              <button class="filter-tab" :class="{active: repeatForm.endCondition === 'count'}" @click="repeatForm.endCondition = 'count'" type="button">X Times</button>
+              <button class="filter-tab" :class="{active: repeatForm.endCondition === 'date'}" @click="repeatForm.endCondition = 'date'" type="button">Date</button>
+            </div>
+
+            <div class="recurrence-options recurrence-options-nested" v-if="repeatForm.endCondition === 'count'">
+              <div class="form-group form-group-last">
+                <label>Number of Times</label>
+                <input type="number" v-model.number="repeatForm.endCount" min="1" placeholder="Number of times">
+              </div>
+            </div>
+
+            <div class="recurrence-options recurrence-options-nested" v-if="repeatForm.endCondition === 'date'">
+              <div class="form-group form-group-last">
+                <label>End Date</label>
+                <input type="date" v-model="repeatForm.endDate">
+              </div>
+            </div>
+          </div>
+
+            <div class="chip-popover-actions">
+              <button class="btn-secondary" @click="closeRepeatAddModal" type="button">Cancel</button>
+              <button class="btn-primary" @click="saveRepeatTask" type="button">Save Repeat Task</button>
+            </div>
+          </div>
+          <div class="modal-right">
+            <h4 class="modal-subtitle">Preview</h4>
+            <div class="preview-list">
+              <div v-for="(date, idx) in previewDates.slice(0, 7)" :key="idx" class="preview-item">
+                <span class="preview-number">{{ idx + 1 }}</span>
+                <span class="preview-date">{{ formatDateFull(date) }}</span>
+              </div>
+              <div v-if="!previewDates.length" class="preview-empty">No dates to preview</div>
+              <div v-if="previewDates.length > 7" class="preview-more">...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirm Dialog -->
+    <div v-if="showConfirmDialog" class="modal-backdrop confirm-backdrop">
+      <div class="confirm-panel">
+        <div class="confirm-icon" :class="{ 'import-icon': confirmType === 'import' }" v-html="confirmType === 'import' ? icons.import : icons.delete"></div>
+        <div class="confirm-title">Confirm</div>
+        <div class="confirm-message">{{ confirmMessage }}</div>
+        <div class="confirm-actions">
+          <button class="btn-secondary" @click="closeConfirm(false)">Cancel</button>
+          <button :class="confirmType === 'import' ? 'btn-primary' : 'btn-danger'" @click="closeConfirm(true)">{{ confirmType === 'import' ? 'Import' : 'Delete' }}</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div v-if="showSettings" class="modal-backdrop" @click="closeSettings">
+      <div class="modal-panel" @click.stop>
+        <h3 class="modal-title">Settings</h3>
+
+        <div class="settings-section">
+          <span class="settings-label">Data Management</span>
+          <div class="settings-grid">
+            <button class="btn-secondary" @click="exportJSON">
+              <span class="modal-btn-icon" v-html="icons.export"></span> Export
+            </button>
+            <label class="btn-secondary btn-file-label">
+              <span class="modal-btn-icon" v-html="icons.import"></span> Import
+              <input type="file" accept=".json" @change="importJSON" hidden>
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <span class="settings-label">Interface</span>
+          <div class="settings-rows">
+            <button class="btn-toggle" :class="{active: confirmBeforeDelete}" @click="toggleSetting('confirmBeforeDelete')">
+              <span class="toggle-label">Confirm before Task Delete</span>
+              <span class="toggle-track"><span class="toggle-knob"></span></span>
+            </button>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <span class="settings-label">Tasks List</span>
+          <div class="settings-rows">
+            <button class="btn-toggle" :class="{active: trackInProgress}" @click="toggleSetting('trackInProgress')">
+              <span class="toggle-label">Track "In Progress" Status</span>
+              <span class="toggle-track"><span class="toggle-knob"></span></span>
+            </button>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <span class="settings-label">Dashboard</span>
+          <div class="settings-rows">
+            <button class="btn-toggle" :class="{active: hideEmptyLists}" @click="toggleSetting('hideEmptyLists')">
+              <span class="toggle-label">Hide Empty Lists</span>
+              <span class="toggle-track"><span class="toggle-knob"></span></span>
+            </button>
+            <button class="btn-toggle" :class="{active: hideCustomList}" @click="toggleSetting('hideCustomList')">
+              <span class="toggle-label">Hide Custom List</span>
+              <span class="toggle-track"><span class="toggle-knob"></span></span>
+            </button>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <span class="settings-label">Shortcuts</span>
+          <div class="settings-rows shortcuts-list">
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Create New Task</span>
+              <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>M</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Create Repeat Task</span>
+              <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>K</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Find Tasks</span>
+              <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>F</kbd></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="helpers.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
