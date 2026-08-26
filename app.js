@@ -470,10 +470,7 @@ createApp({
     openInstanceEditor(item) {
       this.closeCreatedEditor();
       this.instanceEditingId = item.id;
-      this.instanceForm = this.getRepeatInstances(item, 7, true).map(inst => ({
-        ...inst,
-        checked: (item.completedDates || []).includes(inst.repeatInstanceDate)
-      }));
+      this.instanceForm = this.getRepeatInstanceWindow(item, 7);
     },
 
     closeInstanceEditor() {
@@ -499,10 +496,9 @@ createApp({
     },
 
     instanceChipLabel(item) {
-      const instances = this.getRepeatInstances(item, 7, true);
-      const completed = item.completedDates || [];
-      const done = instances.filter(inst => completed.includes(inst.repeatInstanceDate)).length;
-      return `${done} / ${instances.length} Done`;
+      const window = this.getRepeatInstanceWindow(item, 7);
+      const done = window.filter(inst => inst.checked).length;
+      return `${done} / ${window.length} Done`;
     },
 
     // --- Inline Edit ---
@@ -604,6 +600,34 @@ createApp({
           reminders: []
         });
         if (instances.length >= count) break;
+      }
+      return instances;
+    },
+
+    getRepeatInstanceWindow(repeatTask, uncompletedCount) {
+      const instances = [];
+      const completed = repeatTask.completedDates || [];
+      let uncompletedFound = 0;
+      for (const next of this.occurrenceGenerator(repeatTask, { maxIterations: uncompletedCount * 6 })) {
+        const d = new Date(next);
+        const dateStr = this.formatDateForInput(d);
+        const isDone = completed.includes(dateStr);
+        instances.push({
+          id: 'repeat-' + repeatTask.id + '-' + next,
+          title: repeatTask.title,
+          hasDueDate: true,
+          dueDate: next,
+          status: isDone ? 'finished' : 'not-started',
+          createdAt: Date.now(),
+          completedAt: null,
+          repeatTaskId: repeatTask.id,
+          repeatInstanceDate: dateStr,
+          subtasks: [],
+          reminders: [],
+          checked: isDone
+        });
+        if (!isDone) uncompletedFound++;
+        if (uncompletedFound >= uncompletedCount) break;
       }
       return instances;
     },
@@ -761,9 +785,12 @@ createApp({
     removeSubtaskInline(index) { this.subtaskEditForm.splice(index, 1); },
 
     startSubtaskEdit(st) {
-      if (this.subtaskJustSaved) return;
+      if (this.editingSubtaskId && this.editingSubtaskId !== st.id) {
+        this.saveSubtaskEditInline();
+      }
       this.editingSubtaskId = st.id;
       this.subtaskEditValue = st.text;
+      this.subtaskJustSaved = false;
       this.$nextTick(() => {
         const inputs = this.$refs.subtaskEditInput;
         const el = Array.isArray(inputs) ? inputs[0] : inputs;
@@ -779,8 +806,6 @@ createApp({
       }
       this.editingSubtaskId = null;
       this.subtaskEditValue = '';
-      this.subtaskJustSaved = true;
-      setTimeout(() => { this.subtaskJustSaved = false; }, 150);
     },
 
     cancelSubtaskEdit() {
