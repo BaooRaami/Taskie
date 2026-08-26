@@ -24,7 +24,15 @@ Open `index.html` in any browser. No build step, no terminal needed.
 
 ## Future Plans
 
-Categories/tags, priority levels, archive/trash, PWA support, bulk actions, light theme, productivity stats.
+## Future Plans
+
+- [ ] Categories / Tags
+- [ ] Priority Levels
+- [ ] Archive / Trash
+- [ ] PWA Support
+- [ ] Bulk Actions
+- [ ] Light Theme
+- [ ] Productivity Stats
 
 ## License
 
