@@ -24,8 +24,6 @@ Open `index.html` in any browser. No build step, no terminal needed.
 
 ## Future Plans
 
-## Future Plans
-
 - [ ] Categories / Tags
 - [ ] Priority Levels
 - [ ] Archive / Trash
