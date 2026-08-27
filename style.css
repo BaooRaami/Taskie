@@ -7,6 +7,12 @@
 .loader-spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: loader-spin 0.8s linear infinite; }
 @keyframes loader-spin { to { transform: rotate(360deg); } }
 
+/* ===== Toast ===== */
+.toast { position: fixed; top: 16px; left: 50%; transform: translateX(-50%) translateY(-12px); z-index: 600; display: flex; align-items: center; gap: 8px; background: var(--success-dim); color: var(--success); border: 1px solid var(--success); padding: 10px 16px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; opacity: 0; pointer-events: none; transition: all 0.25s ease; box-shadow: var(--shadow); }
+.toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast-icon { width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; }
+.toast-icon svg { width: 18px; height: 18px; display: block; }
+
 :root {
   --bg: #0b0d10;
   --surface: #15181f;
@@ -70,7 +76,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxyge
 
 .stat-boxes.three-col { grid-template-columns: repeat(3, 1fr); }
 
-.stat-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; cursor: pointer; transition: var(--transition); border-top: 3px solid transparent; }
+.stat-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; display: flex; flex-direction: row; align-items: center; justify-content: space-between; cursor: pointer; transition: var(--transition); border-top: 3px solid transparent; flex-wrap: wrap; }
 
 .stat-box:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
 
@@ -85,6 +91,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxyge
 .stat-count { font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; }
 .stat-label { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
 .stat-box:hover .stat-count { color: var(--stat-color); }
+
+.stat-breakdown { display: flex; gap: 10px; width: 100%; justify-content: flex-end; margin-top: 6px; padding-top: 4px; border-top: 1px solid var(--border); }
+.stat-break-item { font-size: 10px; color: var(--text-muted); font-weight: 500; }
 
 /* Dashboard Lists */
 .dashboard-lists { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; flex: 1; min-height: 0; }
@@ -178,6 +187,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxyge
 
 /* ===== Repeat Tasks Page ===== */
 .repeat-tasks-page { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+
+/* ===== Settings Page ===== */
+.settings-page { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.settings-page .title-tabs-row { margin-bottom: 8px; }
+.settings-page .settings-section { display: flex; align-items: center; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+.settings-page .settings-section:last-child { border-bottom: none; }
 .task-table tbody tr.clickable-row { cursor: pointer; }
 .task-table .chip { display: inline-flex; align-items: center; vertical-align: middle; }
 .task-table .subtasks-chip { display: inline-flex; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
@@ -310,9 +325,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxyge
 
 .due-chip.overdue { border-color: var(--danger); color: var(--danger); background: var(--danger-dim); }
 
+.due-chip.subtasks-due { border-color: var(--info); color: var(--info); background: var(--info-dim); cursor: default; }
+
+.due-chip.subtasks-due:hover { border-color: var(--info); color: var(--info); }
+
 .cell-subtasks, .cell-due-chip, .cell-created-chip { position: relative; }
 
-.chip-popover { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 300; background: var(--surface-elevated); border: 1px solid var(--border-light); border-radius: var(--radius); padding: 14px; width: 320px; max-width: calc(100vw - 40px); max-height: calc(100vh - 40px); overflow-y: auto; box-shadow: var(--shadow); }
+.chip-popover { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 300; background: var(--surface-elevated); border: 1px solid var(--border-light); border-radius: var(--radius); padding: 14px; width: 320px; max-width: calc(100vw - 40px); max-height: calc(100vh - 40px); overflow-y: auto; box-shadow: var(--shadow); opacity: 1 !important; }
+
+.chip-popover-wide { width: 520px; }
 
 .chip-popover .form-group:last-of-type { margin-bottom: 10px; }
 
@@ -321,6 +342,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxyge
 .date-clear-row .btn-danger { padding: 7px 12px; font-size: 12px; white-space: nowrap; }
 
 .chip-popover-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+
+.chip-popover-actions .btn-danger { font-size: 12px; padding: 7px 14px; }
 
 /* ===== Form Elements ===== */
 .form-group { margin-bottom: 14px; }
@@ -387,44 +410,73 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxyge
 .instance-text:hover { color: var(--accent); }
 .instance-form-item.finished .instance-text { text-decoration: line-through; color: var(--text-muted); }
 
-/* ===== Subtasks ===== */
-.subtask-form-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+/* ===== Subtasks Table ===== */
+.subtask-add-header { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
 
-.subtask-form-item { display: flex; justify-content: space-between; align-items: center; background: var(--bg); border: 1px solid var(--border); padding: 7px 10px; border-radius: var(--radius-sm); font-size: 12px; cursor: pointer; }
+.subtask-add-input { flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px 10px; border-radius: var(--radius-sm); font-size: 13px; outline: none; font-family: inherit; }
 
-.subtask-form-item button { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 18px; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: var(--transition); line-height: 1; padding: 0; }
+.subtask-add-input:focus { border-color: var(--accent); }
 
-.subtask-form-item button:hover { background: var(--danger-dim); color: var(--danger); }
+.subtask-add-date { width: 120px; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px 10px; border-radius: var(--radius-sm); font-size: 12px; outline: none; font-family: inherit; cursor: pointer; }
 
-.subtask-check-label { display: flex; align-items: center; gap: 6px; text-transform: none; letter-spacing: normal; margin-bottom: 0; }
+.subtask-add-date:focus { border-color: var(--accent); }
 
-.subtask-check-label input[type="checkbox"] { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border: 2px solid var(--border-light); border-radius: 5px; background: var(--bg); cursor: pointer; transition: var(--transition); flex-shrink: 0; margin: 0; }
+.subtask-table-wrap { max-height: 280px; overflow-y: auto; margin-bottom: 12px; }
 
-.subtask-check-label input[type="checkbox"]:checked { background: var(--accent); border-color: var(--accent); }
+.subtask-table-wrap::-webkit-scrollbar { width: 4px; }
 
-.subtask-check-label input[type="checkbox"]:focus { outline: none; box-shadow: 0 0 0 2px var(--accent-dim); }
+.subtask-table-wrap::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 4px; }
 
-.subtask-text { cursor: pointer; transition: var(--transition); }
+.subtask-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 
-.subtask-text:hover { color: var(--accent); }
+.subtask-table th { text-align: left; padding: 8px 10px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); background: var(--surface); border-bottom: 1px solid var(--border); white-space: nowrap; }
 
-.subtask-inline-input { flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--accent); color: var(--text); padding: 3px 6px; border-radius: var(--radius-sm); font-size: 12px; outline: none; font-family: inherit; }
+.subtask-table td { padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--text); }
 
-.subtask-add-row { display: flex; gap: 6px; margin-bottom: 14px; }
+.subtask-table tr:hover td { background: var(--surface-hover); }
 
-.subtask-add-row input { flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 7px 9px; border-radius: var(--radius-sm); font-size: 12px; outline: none; font-family: inherit; }
+.col-st-done { width: 36px; text-align: center; }
 
-.subtask-add-row input:focus { border-color: var(--accent); }
+.col-st-text { width: 100%; }
 
-.btn-add-subtask { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 7px 10px; border-radius: var(--radius-sm); cursor: pointer; font-size: 12px; transition: var(--transition); }
+.col-st-due { width: 120px; white-space: nowrap; }
+
+.col-st-del { width: 36px; text-align: center; }
+
+/* Custom checkbox (box style) */
+.st-checkbox { display: inline-flex; align-items: center; justify-content: center; cursor: pointer; position: relative; width: 18px; height: 18px; }
+
+.st-checkbox input[type="checkbox"] { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border: 2px solid var(--border-light); border-radius: 5px; background: var(--bg); cursor: pointer; transition: var(--transition); margin: 0; position: relative; }
+
+.st-checkbox input[type="checkbox"]:checked { background: var(--accent); border-color: var(--accent); }
+
+.st-checkbox input[type="checkbox"]:focus { outline: none; box-shadow: 0 0 0 2px var(--accent-dim); }
+
+.cell-st-text { cursor: pointer; max-width: 0; }
+
+.st-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; transition: var(--transition); }
+
+.st-text.done { text-decoration: line-through; color: var(--text-muted); }
+
+.st-text:hover { color: var(--accent); }
+
+.st-inline-input { width: 100%; background: var(--bg); border: 1px solid var(--accent); color: var(--text); padding: 4px 8px; border-radius: var(--radius-sm); font-size: 13px; outline: none; font-family: inherit; }
+
+.st-date-input { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 4px 6px; border-radius: var(--radius-sm); font-size: 12px; outline: none; font-family: inherit; cursor: pointer; }
+
+.st-date-input:focus { border-color: var(--accent); }
+
+.st-del-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; border-radius: var(--radius-sm); transition: var(--transition); display: flex; align-items: center; justify-content: center; }
+
+.st-del-btn:hover { color: var(--danger); background: var(--danger-dim); }
+
+.st-del-btn svg { width: 16px; height: 16px; display: block; }
+
+.subtask-empty { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+
+.btn-add-subtask { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 14px; border-radius: var(--radius-sm); cursor: pointer; font-size: 12px; font-weight: 600; transition: var(--transition); white-space: nowrap; }
 
 .btn-add-subtask:hover { background: var(--accent); color: var(--bg); }
-
-.chip-popover .subtask-form-list { max-height: 260px; overflow-y: auto; padding-right: 4px; }
-
-.chip-popover .subtask-form-list::-webkit-scrollbar { width: 4px; }
-
-.chip-popover .subtask-form-list::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 4px; }
 
 /* ===== Buttons ===== */
 .btn-primary { background: var(--accent); color: var(--bg); border: none; padding: 9px 18px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; font-weight: 600; transition: var(--transition); }
