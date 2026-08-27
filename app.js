@@ -14,6 +14,8 @@ const icons = Object.fromEntries(Object.entries({
   repeat: "M200-80q-33 0-56.5-23.5T120-160v-560q0-33 23.5-56.5T200-800h40v-80h80v80h320v-80h80v80h40q33 0 56.5 23.5T840-720v240h-80v-80H200v400h280v80H200ZM760 0q-73 0-127.5-45.5T564-160h62q13 44 49.5 72T760-60q58 0 99-41t41-99q0-58-41-99t-99-41q-29 0-54 10.5T662-300h58v60H560v-160h60v57q27-26 63-41.5t77-15.5q83 0 141.5 58.5T960-200q0 83-58.5 141.5T760 0ZM200-640h560v-80H200v80Zm0 0v-80 80Z",
   search: "M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z",
   add: "M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z",
+  tick: "M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z",
+
 }).map(([k, d]) => [k, svg(d)]));
 
 const { createApp } = Vue;
@@ -43,6 +45,8 @@ createApp({
       editingSubtaskId: null,
       subtaskEditValue: '',
       subtaskJustSaved: false,
+      newSubtaskDueDate: '',
+      subtaskEditParentTask: null,
       customDateStart: '',
       customDateEnd: '',
       dashboardSections: [
@@ -53,7 +57,9 @@ createApp({
       ],
       highlightedTaskId: null,
       slidingTaskIds: {},
-      showSettings: false,
+      toastMessage: '',
+      toastVisible: false,
+      toastTimer: null,
       showRepeatAddModal: false,
       repeatTitleError: false,
       showConfirmDialog: false,
@@ -185,13 +191,36 @@ createApp({
         if (customStart !== null && customEnd !== null && dueTime >= customStart && dueTime <= customEnd) groups.custom.push(item);
       };
 
-      // Regular tasks
+      // Regular tasks (parent due dates)
       for (const task of this.tasks) {
         if (task.status === 'finished') continue;
         if (q && !task.title.toLowerCase().includes(q)) continue;
         if (!task.hasDueDate || !task.dueDate) continue;
         const due = new Date(task.dueDate);
         classify(task, new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime());
+      }
+
+      // Subtask virtual items
+      for (const task of this.tasks) {
+        if (task.status === 'finished') continue;
+        if (!task.subtasks || !task.subtasks.length) continue;
+        for (const st of task.subtasks) {
+          if (st.done || !st.dueDate) continue;
+          if (q && !st.text.toLowerCase().includes(q) && !task.title.toLowerCase().includes(q)) continue;
+          const due = new Date(st.dueDate);
+          classify({
+            id: 'subtask-' + task.id + '-' + st.id,
+            title: task.title + ' - ' + st.text,
+            hasDueDate: true,
+            dueDate: st.dueDate,
+            status: 'not-started',
+            createdAt: task.createdAt,
+            completedAt: null,
+            subtasks: [],
+            parentTaskId: task.id,
+            subtaskId: st.id
+          }, new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime());
+        }
       }
 
       // Virtual repeat task instances
@@ -221,6 +250,25 @@ createApp({
       return counts;
     },
 
+    subtaskCounts() {
+      let notStarted = 0, finished = 0;
+      for (const t of this.tasks) {
+        if (!t.subtasks) continue;
+        for (const st of t.subtasks) {
+          if (st.done) finished++;
+          else notStarted++;
+        }
+      }
+      for (const rt of this.repeatTasks) {
+        const window = this.getRepeatInstanceWindow(rt, 7);
+        const done = window.filter(inst => inst.checked).length;
+        const pending = window.filter(inst => !inst.checked).length;
+        finished += done;
+        notStarted += pending;
+      }
+      return { all: notStarted + finished, 'not-started': notStarted, 'in-progress': 0, finished };
+    },
+
     pageTitle() {
       if (this.page === 'repeat-tasks') return `Repeat Tasks: ${this.filteredItems.length}`;
       const labels = { '': 'All Tasks', 'not-started': 'Not Started Tasks', 'in-progress': 'In Progress Tasks', 'finished': 'Finished Tasks' };
@@ -247,7 +295,7 @@ createApp({
   },
 
   methods: {
-        getTodayStart() {
+    getTodayStart() {
       const d = new Date();
       d.setHours(0, 0, 0, 0);
       return d.getTime();
@@ -690,6 +738,7 @@ createApp({
 
     // --- Due Chip ---
     openDueEditor(task) {
+      if (this.taskHasSubtaskDueDates(task)) return;
       this.subtaskEditingId = null;
       this.dueEditingId = task.id;
       const due = task.dueDate ? new Date(task.dueDate) : null;
@@ -737,7 +786,10 @@ createApp({
     isCreatedEditing(id) { return this.createdEditingId === id; },
 
     async saveDueEdit(task) {
-      if (this.dueEditForm.dueDate) {
+      if (this.taskHasSubtaskDueDates(task)) {
+        task.dueDate = null;
+        task.hasDueDate = false;
+      } else if (this.dueEditForm.dueDate) {
         task.dueDate = this.parseInputDate(this.dueEditForm.dueDate);
         task.hasDueDate = true;
       } else {
@@ -751,6 +803,7 @@ createApp({
     isDueEditing(id) { return this.dueEditingId === id; },
 
     dueChipLabel(task) {
+      if (this.taskHasSubtaskDueDates(task)) return 'Subtasks';
       if (!task.hasDueDate || !task.dueDate) return 'Not specified';
       return this.formatDate(task.dueDate);
     },
@@ -759,14 +812,18 @@ createApp({
     openSubtaskEditor(task) {
       this.dueEditingId = null;
       this.subtaskEditingId = task.id;
+      this.subtaskEditParentTask = task;
       this.subtaskEditForm = task.subtasks ? JSON.parse(JSON.stringify(task.subtasks)) : [];
       this.newSubtaskText = '';
+      this.newSubtaskDueDate = '';
     },
 
     closeSubtaskEditor() {
       this.subtaskEditingId = null;
+      this.subtaskEditParentTask = null;
       this.subtaskEditForm = [];
       this.newSubtaskText = '';
+      this.newSubtaskDueDate = '';
     },
 
     addSubtaskInline() {
@@ -776,13 +833,28 @@ createApp({
       this.subtaskEditForm.push({
         id: Date.now() + Math.random(),
         text: text,
-        done: false
+        done: false,
+        dueDate: this.newSubtaskDueDate ? this.parseInputDate(this.newSubtaskDueDate) : null
       });
 
       this.newSubtaskText = '';
+      this.newSubtaskDueDate = '';
     },
 
     removeSubtaskInline(index) { this.subtaskEditForm.splice(index, 1); },
+
+    confirmDeleteAllSubtasks(task) {
+      const t = task || this.subtaskEditParentTask;
+      if (!t) return;
+      const doDelete = () => {
+        this.subtaskEditForm = [];
+      };
+      if (this.confirmBeforeDelete) {
+        this.openConfirm('Delete all subtasks for "' + t.title + '"?', doDelete);
+      } else {
+        doDelete();
+      }
+    },
 
     startSubtaskEdit(st) {
       if (this.editingSubtaskId && this.editingSubtaskId !== st.id) {
@@ -814,11 +886,24 @@ createApp({
     },
 
     async saveSubtaskEdit(task) {
-      task.subtasks = this.subtaskEditForm;
-      const anyDone = task.subtasks.some(s => s.done);
-      if (anyDone && task.status === 'not-started') task.status = 'in-progress';
+      const t = task || this.subtaskEditParentTask;
+      if (!t) return;
+      t.subtasks = this.subtaskEditForm;
+      const allDone = t.subtasks.every(s => s.done);
+      if (allDone && t.status !== 'finished') {
+        t.status = 'finished';
+        t.completedAt = Date.now();
+      } else if (!allDone) {
+        const anyDone = t.subtasks.some(s => s.done);
+        if (t.status === 'finished') {
+          t.status = anyDone ? 'in-progress' : 'not-started';
+          t.completedAt = null;
+        } else {
+          if (anyDone && t.status === 'not-started') t.status = 'in-progress';
+        }
+      }
       this.closeSubtaskEditor();
-      await TaskDB.update(task);
+      await TaskDB.update(t);
       await this.loadTasks();
     },
 
@@ -864,6 +949,9 @@ createApp({
       if (this.isRepeatInstance(task)) {
         this.page = 'repeat-tasks';
         this.scrollAndHighlight('repeatRows', task.repeatTaskId);
+      } else if (String(task.id).startsWith('subtask-')) {
+        this.page = 'tasks';
+        this.scrollAndHighlight('taskRows', task.parentTaskId);
       } else {
         this.page = 'tasks';
         this.scrollAndHighlight('taskRows', task.id);
@@ -874,8 +962,18 @@ createApp({
       const st = task.subtasks.find(s => s.id === subtaskId);
       if (!st) return;
       st.done = !st.done;
-      const anyDone = task.subtasks.some(s => s.done);
-      if (anyDone && task.status === 'not-started') task.status = 'in-progress';
+      const allDone = task.subtasks.every(s => s.done);
+      if (allDone && task.status !== 'finished') {
+        task.status = 'finished';
+        task.completedAt = Date.now();
+      } else if (!allDone) {
+        const anyDone = task.subtasks.some(s => s.done);
+        if (anyDone && task.status === 'not-started') task.status = 'in-progress';
+        if (!anyDone && task.status === 'finished') {
+          task.status = 'not-started';
+          task.completedAt = null;
+        }
+      }
       await TaskDB.update(task);
       await this.loadTasks();
     },
@@ -894,6 +992,25 @@ createApp({
 
     async quickFinish(task) {
       if (this.slidingTaskIds[task.id]) return;
+      if (String(task.id).startsWith('subtask-')) {
+        const parent = this.tasks.find(t => t.id === task.parentTaskId);
+        if (!parent) return;
+        const st = parent.subtasks.find(s => s.id === task.subtaskId);
+        if (!st) return;
+        this.slidingTaskIds[task.id] = true;
+        setTimeout(async () => {
+          st.done = true;
+          const allDone = parent.subtasks.every(s => s.done);
+          if (allDone && parent.status !== 'finished') {
+            parent.status = 'finished';
+            parent.completedAt = Date.now();
+          }
+          await TaskDB.update(parent);
+          await this.loadTasks();
+          delete this.slidingTaskIds[task.id];
+        }, 400);
+        return;
+      }
       if (String(task.id).startsWith('repeat-')) {
         const repeatTask = this.repeatTasks.find(r => r.id === task.repeatTaskId);
         if (!repeatTask) return;
@@ -920,7 +1037,7 @@ createApp({
     formatDateTime(ts) { return this.fmtDate(ts, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }, true); },
     fmtDate(ts, opts, withTime) { if (!ts) return '—'; const d = new Date(ts); return withTime ? d.toLocaleString('en-US', opts) : d.toLocaleDateString('en-US', opts); },
 
-    isOverdue(task) { if (!task.hasDueDate || !task.dueDate || task.status === 'finished') return false; return task.dueDate < Date.now(); },
+    isOverdue(task) { if (this.taskHasSubtaskDueDates(task)) return false; if (!task.hasDueDate || !task.dueDate || task.status === 'finished') return false; return task.dueDate < Date.now(); },
     groupLabel(name) { const labels = { overdue: 'Overdue', today: 'Today', week: 'Due This Week', later: 'Later', noDate: 'No Due Date' }; return labels[name] || name; },
     statusLabel(status) { const labels = { 'not-started': 'Not Started', 'in-progress': 'In Progress', 'finished': 'Finished' }; return labels[status] || status; },
 
@@ -957,7 +1074,7 @@ createApp({
                 this.saveRepeatTasksToDB();
               }
               await this.loadTasks();
-              this.closeSettings();
+              this.page = 'dashboard';
             } catch (err) { alert('Import failed: ' + err.message); }
             event.target.value = '';
           };
@@ -973,19 +1090,30 @@ createApp({
 
     // testSound() { playChime(); },
 
-    openSettings() { this.showSettings = true; },
-    closeSettings() { this.showSettings = false; },
+    openSettings() { this.page = 'settings'; },
+    closeSettings() { this.page = 'dashboard'; },
     closeAllEditors() {
       this.closeSubtaskEditor();
       this.closeDueEditor();
       this.closeCreatedEditor();
       this.closeInstanceEditor();
-      this.closeSettings();
       this.closeRepeatAddModal();
       this.closeConfirm(false);
     },
 
     formatDateForInput(date) { const y = date.getFullYear(); const m = String(date.getMonth() + 1).padStart(2, '0'); const d = String(date.getDate()).padStart(2, '0'); return `${y}-${m}-${d}`; },
+
+    taskHasSubtaskDueDates(task) {
+      return task.subtasks && task.subtasks.some(s => s.dueDate);
+    },
+
+    subtaskDueDateValue(st) {
+      return st.dueDate ? this.formatDateForInput(new Date(st.dueDate)) : '';
+    },
+
+    updateSubtaskDueDate(st, val) {
+      st.dueDate = val ? this.parseInputDate(val) : null;
+    },
 
     focusQuickAdd() {
       if (this.page !== 'tasks') this.page = 'tasks';
@@ -1008,6 +1136,13 @@ createApp({
       if (el) el.blur();
     },
 
+    showToast(message) {
+      this.toastMessage = message;
+      this.toastVisible = true;
+      if (this.toastTimer) clearTimeout(this.toastTimer);
+      this.toastTimer = setTimeout(() => { this.toastVisible = false; }, 2000);
+    },
+
     focusSearch() {
       if (this.page !== 'tasks' && this.page !== 'repeat-tasks') this.page = 'tasks';
       this.$nextTick(() => {
@@ -1028,8 +1163,6 @@ createApp({
     this.loadRepeatTasksFromDB();
     this.loadSettings();
     this.loadCustomDates();
-    // requestNotificationPermission();
-    // Reminders feature removed — no interval needed
     this._clickOutsideHandler = (e) => {
       if (e.target.closest('.chip-popover') || e.target.closest('.chip')) return;
       this.closeSubtaskEditor();
@@ -1042,15 +1175,23 @@ createApp({
     this._keydownHandler = (e) => {
       if (e.ctrlKey && e.key === 'm') {
         e.preventDefault();
+        this.page = 'dashboard';
+      }
+      if (e.ctrlKey && e.key === 'k') {
+        e.preventDefault();
         this.focusQuickAdd();
+      }
+      if (e.ctrlKey && e.key === 'l') {
+        e.preventDefault();
+        this.focusRepeatQuickAdd();
       }
       if (e.ctrlKey && e.key === 'f') {
         e.preventDefault();
         this.focusSearch();
       }
-      if (e.ctrlKey && e.key === 'k') {
+      if (e.ctrlKey && e.key === 's') {
         e.preventDefault();
-        this.focusRepeatQuickAdd();
+        this.showToast('Already Saved');
       }
       if (e.key === 'Escape') {
         if (document.activeElement === this.$refs.searchInput) {
