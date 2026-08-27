@@ -6,10 +6,18 @@
   <title>Taskie</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🚩%3C/text%3E%3C/svg%3E">
 </head>
 <body>
   <div id="app">
     <div class="app-loader" v-if="false"><div class="loader-spinner"></div></div>
+
+    <!-- Toast -->
+    <div class="toast" :class="{ visible: toastVisible }">
+      <span class="toast-icon" v-html="icons.tick"></span>
+      <span class="toast-text">{{ toastMessage }}</span>
+    </div>
+
     <!-- Header -->
     <aside class="sidebar">
       <div class="sidebar-top">
@@ -37,7 +45,7 @@
       </div>
 
       <div class="sidebar-bottom">
-        <button class="sidebar-button" :class="{active: showSettings}" @click="openSettings" aria-label="Settings" title="Settings">
+        <button class="sidebar-button" :class="{active: page === 'settings'}" @click="page = 'settings'" aria-label="Settings" title="Settings">
           <span class="sidebar-icon" v-html="icons.settings"></span>
         </button>
       </div>
@@ -48,20 +56,36 @@
       <!-- Stat Boxes -->
       <div class="stat-boxes" :class="{ 'three-col': !trackInProgress }">
         <div class="stat-box stat-all" @click="page = 'tasks'; filterStatus = ''">
-          <span class="stat-count">{{ statusCounts.all }}</span>
           <span class="stat-label">All</span>
+          <span class="stat-count">{{ statusCounts.all + subtaskCounts.all }}</span>
+          <div class="stat-breakdown">
+            <span class="stat-break-item">Main: {{ statusCounts.all }}</span>
+            <span class="stat-break-item">Sub: {{ subtaskCounts.all }}</span>
+          </div>
         </div>
         <div class="stat-box stat-not-started" @click="page = 'tasks'; filterStatus = 'not-started'">
-          <span class="stat-count">{{ statusCounts['not-started'] }}</span>
           <span class="stat-label">Not Started</span>
+          <span class="stat-count">{{ statusCounts['not-started'] + subtaskCounts['not-started'] }}</span>
+          <div class="stat-breakdown">
+            <span class="stat-break-item">Main: {{ statusCounts['not-started'] }}</span>
+            <span class="stat-break-item">Sub: {{ subtaskCounts['not-started'] }}</span>
+          </div>
         </div>
         <div v-if="trackInProgress" class="stat-box stat-in-progress" @click="page = 'tasks'; filterStatus = 'in-progress'">
-          <span class="stat-count">{{ statusCounts['in-progress'] }}</span>
           <span class="stat-label">In Progress</span>
+          <span class="stat-count">{{ statusCounts['in-progress'] + subtaskCounts['in-progress'] }}</span>
+          <div class="stat-breakdown">
+            <span class="stat-break-item">Main: {{ statusCounts['in-progress'] }}</span>
+            <span class="stat-break-item">Sub: {{ subtaskCounts['in-progress'] }}</span>
+          </div>
         </div>
         <div class="stat-box stat-finished" @click="page = 'tasks'; filterStatus = 'finished'">
-          <span class="stat-count">{{ statusCounts.finished }}</span>
           <span class="stat-label">Finished</span>
+          <span class="stat-count">{{ statusCounts.finished + subtaskCounts.finished }}</span>
+          <div class="stat-breakdown">
+            <span class="stat-break-item">Main: {{ statusCounts.finished }}</span>
+            <span class="stat-break-item">Sub: {{ subtaskCounts.finished }}</span>
+          </div>
         </div>
       </div>
 
@@ -173,32 +197,6 @@
               <!-- Subtasks -->
               <td class="cell-subtasks">
                 <button class="chip subtasks-chip" @click="openSubtaskEditor(task)">{{subtaskChipLabel(task)}}</button>
-                <div v-if="isSubtaskEditing(task.id)" class="chip-popover" @click.stop>
-                  <div class="subtask-form-list">
-                    <div v-for="(st, idx) in subtaskEditForm" :key="st.id" class="subtask-form-item" @click="startSubtaskEdit(st)">
-                      <div class="subtask-check-label">
-                        <input type="checkbox" v-model="st.done" @click.stop>
-                        <span v-if="editingSubtaskId !== st.id" class="subtask-text">{{st.text}}</span>
-                        <input v-else v-model="subtaskEditValue" @blur="saveSubtaskEditInline" @keyup.enter="saveSubtaskEditInline" @keyup.esc="cancelSubtaskEdit" class="subtask-inline-input" ref="subtaskEditInput" @click.stop>
-                      </div>
-                      <button @click.stop="removeSubtaskInline(idx)">&times;</button>
-                    </div>
-                  </div>
-
-                  <div class="subtask-add-row">
-                    <input
-                      type="text"
-                      v-model="newSubtaskText"
-                      @keyup.enter="addSubtaskInline"
-                      placeholder="Add a subtask..."
-                    >
-                    <button class="btn-add-subtask" @click="addSubtaskInline" type="button">Add</button>
-                  </div>
-                  <div class="chip-popover-actions">
-                    <button class="btn-secondary" @click="closeSubtaskEditor" type="button">Cancel</button>
-                    <button class="btn-primary" @click="saveSubtaskEdit(task)" type="button">Save</button>
-                  </div>
-                </div>
               </td>
 
               <!-- Status -->
@@ -215,7 +213,7 @@
 
               <!-- Due Date -->
               <td class="cell-due-chip">
-                <button class="chip due-chip" :class="{overdue: isOverdue(task)}" @click="openDueEditor(task)">{{dueChipLabel(task)}}</button>
+                <button class="chip due-chip" :class="{overdue: isOverdue(task), 'subtasks-due': taskHasSubtaskDueDates(task)}" @click="openDueEditor(task)">{{dueChipLabel(task)}}</button>
                 <div v-if="isDueEditing(task.id)" class="chip-popover" @click.stop>
                   <div class="form-group">
                     <label>Due Date</label>
@@ -240,6 +238,57 @@
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- Subtask Editor Popover (rendered outside table to avoid opacity inheritance) -->
+      <div v-if="subtaskEditingId !== null" class="chip-popover chip-popover-wide" @click.stop>
+        <div class="subtask-add-header">
+          <input type="text" v-model="newSubtaskText" @keyup.enter="addSubtaskInline" placeholder="New subtask..." class="subtask-add-input">
+          <input type="date" v-model="newSubtaskDueDate" class="subtask-add-date">
+          <button class="btn-add-subtask" @click="addSubtaskInline" type="button">Add</button>
+        </div>
+
+        <div class="subtask-table-wrap">
+          <table class="subtask-table">
+            <thead>
+              <tr>
+                <th class="col-st-done"></th>
+                <th class="col-st-text">Subtask</th>
+                <th class="col-st-due">Due Date</th>
+                <th class="col-st-del"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(st, idx) in subtaskEditForm" :key="st.id">
+                <td class="cell-st-done">
+                  <label class="st-checkbox">
+                    <input type="checkbox" v-model="st.done" @click.stop>
+                    <span class="st-checkbox-box"></span>
+                  </label>
+                </td>
+                <td class="cell-st-text" @click="startSubtaskEdit(st)">
+                  <span v-if="editingSubtaskId !== st.id" class="st-text" :class="{ done: st.done }">{{st.text}}</span>
+                  <input v-else v-model="subtaskEditValue" @blur="saveSubtaskEditInline" @keyup.enter="saveSubtaskEditInline" @keyup.esc="cancelSubtaskEdit" class="st-inline-input" ref="subtaskEditInput" @click.stop>
+                </td>
+                <td class="cell-st-due">
+                  <input type="date" :value="subtaskDueDateValue(st)" @change="updateSubtaskDueDate(st, $event.target.value)" class="st-date-input">
+                </td>
+                <td class="cell-st-del">
+                  <button class="st-del-btn" @click.stop="removeSubtaskInline(idx)" v-html="icons.delete"></button>
+                </td>
+              </tr>
+              <tr v-if="!subtaskEditForm.length">
+                <td colspan="4" class="subtask-empty">No subtasks yet. Add one above.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="chip-popover-actions">
+          <button class="btn-secondary" @click="closeSubtaskEditor" type="button">Cancel</button>
+          <button class="btn-danger" @click="confirmDeleteAllSubtasks(subtaskEditParentTask)" type="button" v-if="subtaskEditForm.length">Delete All</button>
+          <button class="btn-primary" @click="saveSubtaskEdit(subtaskEditParentTask)" type="button">Save</button>
+        </div>
       </div>
     </div>
 
@@ -438,79 +487,83 @@
       </div>
     </div>
 
-    <!-- Settings Modal -->
-    <div v-if="showSettings" class="modal-backdrop" @click="closeSettings">
-      <div class="modal-panel" @click.stop>
-        <h3 class="modal-title">Settings</h3>
+    <!-- ========== SETTINGS PAGE ========== -->
+    <div v-if="page === 'settings'" class="settings-page">
+      <div class="title-tabs-row">
+        <h2 class="page-title">Settings</h2>
+      </div>
 
-        <div class="settings-section">
-          <span class="settings-label">Data Management</span>
-          <div class="settings-grid">
-            <button class="btn-secondary" @click="exportJSON">
-              <span class="modal-btn-icon" v-html="icons.export"></span> Export
-            </button>
-            <label class="btn-secondary btn-file-label">
-              <span class="modal-btn-icon" v-html="icons.import"></span> Import
-              <input type="file" accept=".json" @change="importJSON" hidden>
-            </label>
-          </div>
+      <div class="settings-section">
+        <span class="settings-label">Data Management</span>
+        <div class="settings-grid">
+          <button class="btn-secondary" @click="exportJSON">
+            <span class="modal-btn-icon" v-html="icons.export"></span> Export
+          </button>
+          <label class="btn-secondary btn-file-label">
+            <span class="modal-btn-icon" v-html="icons.import"></span> Import
+            <input type="file" accept=".json" @change="importJSON" hidden>
+          </label>
         </div>
+      </div>
 
-        <div class="settings-section">
-          <span class="settings-label">Interface</span>
-          <div class="settings-rows">
-            <button class="btn-toggle" :class="{active: confirmBeforeDelete}" @click="toggleSetting('confirmBeforeDelete')">
-              <span class="toggle-label">Confirm before Task Delete</span>
-              <span class="toggle-track"><span class="toggle-knob"></span></span>
-            </button>
-          </div>
+      <div class="settings-section">
+        <span class="settings-label">Interface</span>
+        <div class="settings-rows">
+          <button class="btn-toggle" :class="{active: confirmBeforeDelete}" @click="toggleSetting('confirmBeforeDelete')">
+            <span class="toggle-label">Confirm before Task Delete</span>
+            <span class="toggle-track"><span class="toggle-knob"></span></span>
+          </button>
         </div>
+      </div>
 
-        <div class="settings-section">
-          <span class="settings-label">Tasks List</span>
-          <div class="settings-rows">
-            <button class="btn-toggle" :class="{active: trackInProgress}" @click="toggleSetting('trackInProgress')">
-              <span class="toggle-label">Track "In Progress" Status</span>
-              <span class="toggle-track"><span class="toggle-knob"></span></span>
-            </button>
-          </div>
+      <div class="settings-section">
+        <span class="settings-label">Tasks List</span>
+        <div class="settings-rows">
+          <button class="btn-toggle" :class="{active: trackInProgress}" @click="toggleSetting('trackInProgress')">
+            <span class="toggle-label">Track "In Progress" Status</span>
+            <span class="toggle-track"><span class="toggle-knob"></span></span>
+          </button>
         </div>
+      </div>
 
-        <div class="settings-section">
-          <span class="settings-label">Dashboard</span>
-          <div class="settings-rows">
-            <button class="btn-toggle" :class="{active: hideEmptyLists}" @click="toggleSetting('hideEmptyLists')">
-              <span class="toggle-label">Hide Empty Lists</span>
-              <span class="toggle-track"><span class="toggle-knob"></span></span>
-            </button>
-            <button class="btn-toggle" :class="{active: hideCustomList}" @click="toggleSetting('hideCustomList')">
-              <span class="toggle-label">Hide Custom List</span>
-              <span class="toggle-track"><span class="toggle-knob"></span></span>
-            </button>
-          </div>
+      <div class="settings-section">
+        <span class="settings-label">Dashboard</span>
+        <div class="settings-rows">
+          <button class="btn-toggle" :class="{active: hideEmptyLists}" @click="toggleSetting('hideEmptyLists')">
+            <span class="toggle-label">Hide Empty Lists</span>
+            <span class="toggle-track"><span class="toggle-knob"></span></span>
+          </button>
+          <button class="btn-toggle" :class="{active: hideCustomList}" @click="toggleSetting('hideCustomList')">
+            <span class="toggle-label">Hide Custom List</span>
+            <span class="toggle-track"><span class="toggle-knob"></span></span>
+          </button>
         </div>
+      </div>
 
-        <div class="settings-section">
-          <span class="settings-label">Shortcuts</span>
-          <div class="settings-rows shortcuts-list">
-            <div class="shortcut-row">
-              <span class="shortcut-desc">Create New Task</span>
-              <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>M</kbd></span>
-            </div>
-            <div class="shortcut-row">
-              <span class="shortcut-desc">Create Repeat Task</span>
-              <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>K</kbd></span>
-            </div>
-            <div class="shortcut-row">
-              <span class="shortcut-desc">Find Tasks</span>
-              <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>F</kbd></span>
-            </div>
+      <div class="settings-section">
+        <span class="settings-label">Shortcuts</span>
+        <div class="settings-rows shortcuts-list">
+          <div class="shortcut-row">
+            <span class="shortcut-desc">Dashboard</span>
+            <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>M</kbd></span>
+          </div>          
+          <div class="shortcut-row">
+            <span class="shortcut-desc">Create New Task</span>
+            <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>K</kbd></span>
+          </div>
+          <div class="shortcut-row">
+            <span class="shortcut-desc">Create Repeat Task</span>
+            <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>L</kbd></span>
+          </div>
+          <div class="shortcut-row">
+            <span class="shortcut-desc">Find Tasks</span>
+            <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>F</kbd></span>
           </div>
         </div>
       </div>
     </div>
   </div>
-
+  
   <script src="helpers.js"></script>
   <script src="app.js"></script>
 </body>
