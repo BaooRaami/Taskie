@@ -378,7 +378,7 @@
 
           <div class="form-group">
             <label>Task Title</label>
-            <input type="text" v-model="repeatForm.title" placeholder="Type repeat task title..." ref="repeatTitleInput" :class="{ 'input-error': repeatTitleError }" @input="repeatTitleError = false">
+            <input type="text" v-model="repeatForm.title" placeholder="Type repeat task title..." ref="repeatTitleInput" :class="{ 'input-error': repeatTitleError }" @input="repeatTitleError = false" @keyup.enter="saveRepeatTask">
           </div>
 
           <div class="form-group">
@@ -493,73 +493,149 @@
         <h2 class="page-title">Settings</h2>
       </div>
 
-      <div class="settings-section">
-        <span class="settings-label">Data Management</span>
-        <div class="settings-grid">
-          <button class="btn-secondary" @click="exportJSON">
-            <span class="modal-btn-icon" v-html="icons.export"></span> Export
-          </button>
-          <label class="btn-secondary btn-file-label">
-            <span class="modal-btn-icon" v-html="icons.import"></span> Import
-            <input type="file" accept=".json" @change="importJSON" hidden>
-          </label>
-        </div>
-      </div>
+      <div class="settings-grid-wrap">
 
-      <div class="settings-section">
-        <span class="settings-label">Interface</span>
-        <div class="settings-rows">
-          <button class="btn-toggle" :class="{active: confirmBeforeDelete}" @click="toggleSetting('confirmBeforeDelete')">
-            <span class="toggle-label">Confirm before Task Delete</span>
-            <span class="toggle-track"><span class="toggle-knob"></span></span>
-          </button>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <span class="settings-label">Tasks List</span>
-        <div class="settings-rows">
-          <button class="btn-toggle" :class="{active: trackInProgress}" @click="toggleSetting('trackInProgress')">
-            <span class="toggle-label">Track "In Progress" Status</span>
-            <span class="toggle-track"><span class="toggle-knob"></span></span>
-          </button>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <span class="settings-label">Dashboard</span>
-        <div class="settings-rows">
-          <button class="btn-toggle" :class="{active: hideEmptyLists}" @click="toggleSetting('hideEmptyLists')">
-            <span class="toggle-label">Hide Empty Lists</span>
-            <span class="toggle-track"><span class="toggle-knob"></span></span>
-          </button>
-          <button class="btn-toggle" :class="{active: hideCustomList}" @click="toggleSetting('hideCustomList')">
-            <span class="toggle-label">Hide Custom List</span>
-            <span class="toggle-track"><span class="toggle-knob"></span></span>
-          </button>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <span class="settings-label">Shortcuts</span>
-        <div class="settings-rows shortcuts-list">
-          <div class="shortcut-row">
-            <span class="shortcut-desc">Dashboard</span>
-            <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>M</kbd></span>
-          </div>          
-          <div class="shortcut-row">
-            <span class="shortcut-desc">Create New Task</span>
-            <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>K</kbd></span>
+        <div class="settings-top-row">
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-card-icon" v-html="icons.palette"></span>
+              <div class="settings-card-heading">
+                <span class="settings-card-title">Appearance</span>
+                <span class="settings-card-sub">Choose a theme for the app</span>
+              </div>
+            </div>
+            <div class="theme-grid">
+              <div class="theme-row-primary">
+                <button
+                  v-for="t in themes.slice(0, 2)"
+                  :key="t.key"
+                  type="button"
+                  class="theme-swatch"
+                  :class="{active: currentTheme === t.key}"
+                  @click="setTheme(t.key)"
+                >
+                  <span class="theme-swatch-preview" :class="'theme-preview-' + t.key"></span>
+                  <span class="theme-swatch-name">{{ t.name }}</span>
+                </button>
+              </div>
+              <div class="theme-row-secondary">
+                <button
+                  v-for="t in themes.slice(2)"
+                  :key="t.key"
+                  type="button"
+                  class="theme-swatch"
+                  :class="{active: currentTheme === t.key}"
+                  @click="setTheme(t.key)"
+                >
+                  <span class="theme-swatch-preview" :class="'theme-preview-' + t.key"></span>
+                  <span class="theme-swatch-name">{{ t.name }}</span>
+                </button>
+              </div>
+            </div>
           </div>
-          <div class="shortcut-row">
-            <span class="shortcut-desc">Create Repeat Task</span>
-            <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>L</kbd></span>
-          </div>
-          <div class="shortcut-row">
-            <span class="shortcut-desc">Find Tasks</span>
-            <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>F</kbd></span>
+
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-card-icon" v-html="icons.keyboard"></span>
+              <div class="settings-card-heading">
+                <span class="settings-card-title">Shortcuts</span>
+                <span class="settings-card-sub">Keyboard shortcuts</span>
+              </div>
+            </div>
+            <div class="settings-rows shortcuts-list">
+              <div class="shortcut-row">
+                <span class="shortcut-desc">Dashboard</span>
+                <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>M</kbd></span>
+              </div>
+              <div class="shortcut-row">
+                <span class="shortcut-desc">Create New Task</span>
+                <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>K</kbd></span>
+              </div>
+              <div class="shortcut-row">
+                <span class="shortcut-desc">Create Repeat Task</span>
+                <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>L</kbd></span>
+              </div>
+              <div class="shortcut-row">
+                <span class="shortcut-desc">Find Tasks</span>
+                <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>F</kbd></span>
+              </div>
+            </div>
           </div>
         </div>
+
+        <div class="settings-cards-row">
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-card-icon" v-html="icons.export"></span>
+              <div class="settings-card-heading">
+                <span class="settings-card-title">Data Management</span>
+                <span class="settings-card-sub">Backup or restore your tasks</span>
+              </div>
+            </div>
+            <div class="settings-btn-row">
+              <button class="btn-secondary" @click="exportJSON">
+                <span class="modal-btn-icon" v-html="icons.export"></span> Export
+              </button>
+              <label class="btn-secondary btn-file-label">
+                <span class="modal-btn-icon" v-html="icons.import"></span> Import
+                <input type="file" accept=".json" @change="importJSON" hidden>
+              </label>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-card-icon" v-html="icons.settings"></span>
+              <div class="settings-card-heading">
+                <span class="settings-card-title">Interface</span>
+                <span class="settings-card-sub">General behavior</span>
+              </div>
+            </div>
+            <div class="settings-toggle-list">
+              <button class="btn-toggle" :class="{active: confirmBeforeDelete}" @click="toggleSetting('confirmBeforeDelete')">
+                <span class="toggle-label">Confirm before Task Delete</span>
+                <span class="toggle-track"><span class="toggle-knob"></span></span>
+              </button>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-card-icon" v-html="icons.tasks"></span>
+              <div class="settings-card-heading">
+                <span class="settings-card-title">Tasks List</span>
+                <span class="settings-card-sub">Status tracking options</span>
+              </div>
+            </div>
+            <div class="settings-toggle-list">
+              <button class="btn-toggle" :class="{active: trackInProgress}" @click="toggleSetting('trackInProgress')">
+                <span class="toggle-label">Track "In Progress" Status</span>
+                <span class="toggle-track"><span class="toggle-knob"></span></span>
+              </button>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-card-icon" v-html="icons.dashboard"></span>
+              <div class="settings-card-heading">
+                <span class="settings-card-title">Dashboard</span>
+                <span class="settings-card-sub">What shows on your home screen</span>
+              </div>
+            </div>
+            <div class="settings-toggle-list">
+              <button class="btn-toggle" :class="{active: hideEmptyLists}" @click="toggleSetting('hideEmptyLists')">
+                <span class="toggle-label">Hide Empty Lists</span>
+                <span class="toggle-track"><span class="toggle-knob"></span></span>
+              </button>
+              <button class="btn-toggle" :class="{active: hideCustomList}" @click="toggleSetting('hideCustomList')">
+                <span class="toggle-label">Hide Custom List</span>
+                <span class="toggle-track"><span class="toggle-knob"></span></span>
+              </button>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
