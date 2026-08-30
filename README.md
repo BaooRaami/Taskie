@@ -15,7 +15,7 @@ I work in a fast-paced industry where I juggle multiple tasks every day — some
 
 ## Tech Stack
 
-Vue.js 3 (CDN) + IndexedDB + Pure CSS (dark theme)
+Vue.js 3 (CDN or local copy) + IndexedDB + Pure CSS
 
 
 ## Run It
