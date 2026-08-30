@@ -24,12 +24,12 @@ Open `index.html` in any browser. No build step, no terminal needed.
 
 ## Future Plans
 
+- [x] Themes Support
 - [ ] Categories / Tags
 - [ ] Priority Levels
 - [ ] Archive / Trash
 - [ ] PWA Support
 - [ ] Bulk Actions
-- [ ] Light Theme
 - [ ] Productivity Stats
 
 ## License
