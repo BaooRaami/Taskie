@@ -15,6 +15,8 @@ const icons = Object.fromEntries(Object.entries({
   search: "M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z",
   add: "M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z",
   tick: "M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z",
+  palette: "M480-80q-82 0-155-31.5t-127.5-86Q143-252 111.5-325T80-480q0-83 32.5-155.5t88-127Q256-817 328-848.5T480-880q80 0 151 27.5t124.5 76q53.5 48.5 85 115T872-508q0 100-59.5 156T650-296h-72q-11 0-15.5 7t-4.5 15q0 16 20 42t20 62q0 42-25 65t-93 23Zm-260-320q26 0 43-17t17-43q0-26-17-43t-43-17q-26 0-43 17t-17 43q0 26 17 43t43 17Zm140-160q26 0 43-17t17-43q0-26-17-43t-43-17q-26 0-43 17t-17 43q0 26 17 43t43 17Zm200 0q26 0 43-17t17-43q0-26-17-43t-43-17q-26 0-43 17t-17 43q0 26 17 43t43 17Zm140 160q26 0 43-17t17-43q0-26-17-43t-43-17q-26 0-43 17t-17 43q0 26 17 43t43 17ZM480-160q17 0 28.5-11.5T520-200q0-17-11.5-28.5T480-240q-17 0-28.5 11.5T440-200q0 17 11.5 28.5T480-160Z",
+  keyboard: "M160-200q-33 0-56.5-23.5T80-280v-400q0-33 23.5-56.5T160-760h640q33 0 56.5 23.5T880-680v400q0 33-23.5 56.5T800-200H160Zm0-80h640v-400H160v400Zm120-40h400v-80H280v80ZM200-440h80v-80h-80v80Zm120 0h80v-80h-80v80Zm120 0h80v-80h-80v80Zm120 0h80v-80h-80v80Zm120 0h80v-80h-80v80ZM200-560h80v-80h-80v80Zm120 0h80v-80h-80v80Zm120 0h80v-80h-80v80Zm120 0h80v-80h-80v80Zm120 0h80v-80h-80v80Z",
 
 }).map(([k, d]) => [k, svg(d)]));
 
@@ -69,6 +71,14 @@ createApp({
       hideEmptyLists: false,
       hideCustomList: false,
       trackInProgress: true,
+      currentTheme: 'dark',
+      themes: [
+        { key: 'dark', name: 'Dark' },
+        { key: 'light', name: 'Light' },
+        { key: 'ocean', name: 'Ocean' },
+        { key: 'forest', name: 'Forest' },
+        { key: 'sunset', name: 'Sunset' }
+      ],
       weekDaysList: [
         { label: 'Mon', val: 1 },
         { label: 'Tue', val: 2 },
@@ -330,10 +340,13 @@ createApp({
       const hc = localStorage.getItem('taskyHideCustom');
       const tip = localStorage.getItem('taskyTrackInProgress');
       const cbd = localStorage.getItem('taskyConfirmBeforeDelete');
+      const theme = localStorage.getItem('taskyTheme');
       this.hideEmptyLists = he === 'true';
       this.hideCustomList = hc === 'true';
       this.trackInProgress = tip !== 'false';
       this.confirmBeforeDelete = cbd !== 'false';
+      this.currentTheme = theme || 'dark';
+      document.documentElement.setAttribute('data-theme', this.currentTheme);
     },
 
     saveSettings() {
@@ -341,9 +354,16 @@ createApp({
       localStorage.setItem('taskyHideCustom', this.hideCustomList);
       localStorage.setItem('taskyTrackInProgress', this.trackInProgress);
       localStorage.setItem('taskyConfirmBeforeDelete', this.confirmBeforeDelete);
+      localStorage.setItem('taskyTheme', this.currentTheme);
     },
 
     toggleSetting(key) { this[key] = !this[key]; this.saveSettings(); },
+
+    setTheme(theme) {
+      this.currentTheme = theme;
+      document.documentElement.setAttribute('data-theme', theme);
+      this.saveSettings();
+    },
 
     loadCustomDates() {
       const savedStart = localStorage.getItem('taskyCustomDateStart');
@@ -518,7 +538,35 @@ createApp({
     openInstanceEditor(item) {
       this.closeCreatedEditor();
       this.instanceEditingId = item.id;
-      this.instanceForm = this.getRepeatInstanceWindow(item, 7);
+      const window = this.getRepeatInstanceWindow(item, 7);
+      const completed = item.completedDates || [];
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const thirtyDaysAgo = new Date(today);
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      for (const dateStr of completed) {
+        if (window.some(w => w.repeatInstanceDate === dateStr)) continue;
+        const [y, m, d] = dateStr.split('-').map(Number);
+        const dueTime = new Date(y, m - 1, d).getTime();
+        if (dueTime >= thirtyDaysAgo.getTime()) {
+          window.push({
+            id: 'repeat-' + item.id + '-' + dueTime,
+            title: item.title,
+            hasDueDate: true,
+            dueDate: dueTime,
+            status: 'finished',
+            createdAt: Date.now(),
+            completedAt: null,
+            repeatTaskId: item.id,
+            repeatInstanceDate: dateStr,
+            subtasks: [],
+            reminders: [],
+            checked: true
+          });
+        }
+      }
+      window.sort((a, b) => a.dueDate - b.dueDate);
+      this.instanceForm = window;
     },
 
     closeInstanceEditor() {
@@ -546,7 +594,8 @@ createApp({
     instanceChipLabel(item) {
       const window = this.getRepeatInstanceWindow(item, 7);
       const done = window.filter(inst => inst.checked).length;
-      return `${done} / ${window.length} Done`;
+      const totalCompleted = (item.completedDates || []).length;
+      return `${done} / ${window.length} Done` + (totalCompleted > done ? ` (${totalCompleted} total)` : '');
     },
 
     // --- Inline Edit ---
