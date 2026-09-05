@@ -1,4 +1,4 @@
-/* Tasky - Multi-Theme Support */
+/* Taskie - Multi-Theme Support */
 
 /* ===== CSS Variables & Base ===== */
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -401,6 +401,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxyge
 
 .task-table tr.finished .task-title-text { text-decoration: line-through; color: var(--text-muted); }
 
+.task-table tr.first-finished-row td { border-top: 3px solid var(--border-light); }
+
 .empty-row { text-align: center; padding: 40px; color: var(--text-muted); }
 
 .task-title-cell { max-width: none; cursor: pointer; }
@@ -457,9 +459,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxyge
 .date-clear-row input[type="date"] { flex: 1; }
 .date-clear-row .btn-danger { padding: 7px 12px; font-size: 12px; white-space: nowrap; }
 
-.chip-popover-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+.chip-popover-actions { display: flex; gap: 16px; justify-content: space-between; align-items: center; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
 
 .chip-popover-actions .btn-danger { font-size: 12px; padding: 7px 14px; }
+
+.chip-popover-actions-right { display: flex; gap: 8px; margin-left: auto; }
 
 /* ===== Form Elements ===== */
 .form-group { margin-bottom: 14px; }
@@ -560,7 +564,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxyge
 .col-st-del { width: 36px; text-align: center; }
 
 /* Custom checkbox (box style) */
-.st-checkbox { display: inline-flex; align-items: center; justify-content: center; cursor: pointer; position: relative; width: 18px; height: 18px; }
+.st-checkbox { display: inline-flex; align-items: center; justify-content: center; cursor: pointer; position: relative; width: 18px; height: 18px; vertical-align: middle; }
 
 .st-checkbox input[type="checkbox"] { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border: 2px solid var(--border-light); border-radius: 5px; background: var(--bg); cursor: pointer; transition: var(--transition); margin: 0; position: relative; }
 
