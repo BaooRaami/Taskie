@@ -31,21 +31,21 @@
             <span class="brand-letter">E</span>
           </div>
         </div>
-        <button class="sidebar-button" :class="{active: page === 'dashboard'}" @click="page = 'dashboard'" aria-label="Dashboard" title="Dashboard">
+        <button class="sidebar-button" :class="{active: page === 'dashboard'}" @click="navigateTo('dashboard')" aria-label="Dashboard" title="Dashboard">
           <span class="sidebar-icon" v-html="icons.dashboard"></span>
         </button>
 
-        <button class="sidebar-button" :class="{active: page === 'tasks'}" @click="page = 'tasks'" aria-label="Tasks" title="Tasks List">
+        <button class="sidebar-button" :class="{active: page === 'tasks'}" @click="navigateTo('tasks')" aria-label="Tasks" title="Tasks List">
           <span class="sidebar-icon" v-html="icons.tasks"></span>
         </button>
 
-        <button class="sidebar-button" :class="{active: page === 'repeat-tasks'}" @click="page = 'repeat-tasks'" aria-label="Repeat Tasks" title="Repeat Tasks">
+        <button class="sidebar-button" :class="{active: page === 'repeat-tasks'}" @click="navigateTo('repeat-tasks')" aria-label="Repeat Tasks" title="Repeat Tasks">
           <span class="sidebar-icon" v-html="icons.repeat"></span>
         </button>
       </div>
 
       <div class="sidebar-bottom">
-        <button class="sidebar-button" :class="{active: page === 'settings'}" @click="page = 'settings'" aria-label="Settings" title="Settings">
+        <button class="sidebar-button" :class="{active: page === 'settings'}" @click="navigateTo('settings')" aria-label="Settings" title="Settings">
           <span class="sidebar-icon" v-html="icons.settings"></span>
         </button>
       </div>
@@ -122,9 +122,9 @@
             <span class="list-box-count">{{dashboardGroups.custom.length}}</span>
           </div>
           <div class="custom-date-row">
-            <input type="date" v-model="customDateStart" @change="saveCustomDates">
+            <input type="date" v-model="customDateStart" @change="saveCustomDates" @keyup.enter="saveCustomDates">
             <span>to</span>
-            <input type="date" v-model="customDateEnd" @change="saveCustomDates">
+            <input type="date" v-model="customDateEnd" @change="saveCustomDates" @keyup.enter="saveCustomDates">
           </div>
           <div class="list-box-body">
             <div v-if="!dashboardGroups.custom.length" class="list-empty">No tasks in range</div>
@@ -178,13 +178,13 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="task in filteredItems" :key="task.id" :class="[task.status, { 'task-highlight': highlightedTaskId === task.id }]" :data-task-id="task.id" ref="taskRows">
+            <tr v-for="(task, index) in filteredItems" :key="task.id" :class="[task.status, { 'task-highlight': highlightedTaskId === task.id, 'first-finished-row': moveFinishedToEnd && index > 0 && task.status === 'finished' && filteredItems[index - 1].status !== 'finished' }]" :data-task-id="task.id" ref="taskRows">
               <td class="cell-created-chip">
                 <button class="chip created-chip" @click="openCreatedEditor(task)">{{formatDate(task.createdAt)}}</button>
                 <div v-if="isCreatedEditing(task.id)" class="chip-popover" @click.stop>
                   <div class="form-group">
                     <label>Created Date</label>
-                    <input type="date" v-model="createdEditValue" @blur="saveCreatedEdit(task)">
+                    <input type="date" v-model="createdEditValue" @blur="saveCreatedEdit(task)" @keyup.enter="saveCreatedEdit(task)">
                   </div>
                 </div>
               </td>
@@ -218,7 +218,7 @@
                   <div class="form-group">
                     <label>Due Date</label>
                     <div class="date-clear-row">
-                      <input type="date" v-model="dueEditForm.dueDate">
+                      <input type="date" v-model="dueEditForm.dueDate" @keyup.enter="closeDueEditor">
                       <button class="btn-danger" v-if="dueEditForm.dueDate" @click="clearDueDate(task)" type="button">Clear</button>
                     </div>
                   </div>
@@ -244,7 +244,7 @@
       <div v-if="subtaskEditingId !== null" class="chip-popover chip-popover-wide" @click.stop>
         <div class="subtask-add-header">
           <input type="text" v-model="newSubtaskText" @keyup.enter="addSubtaskInline" placeholder="New subtask..." class="subtask-add-input">
-          <input type="date" v-model="newSubtaskDueDate" class="subtask-add-date">
+          <input type="date" v-model="newSubtaskDueDate" class="subtask-add-date" @keyup.enter="$event.target.blur(); addSubtaskInline()">
           <button class="btn-add-subtask" @click="addSubtaskInline" type="button">Add</button>
         </div>
 
@@ -271,7 +271,7 @@
                   <input v-else v-model="subtaskEditValue" @blur="saveSubtaskEditInline" @keyup.enter="saveSubtaskEditInline" @keyup.esc="cancelSubtaskEdit" class="st-inline-input" ref="subtaskEditInput" @click.stop>
                 </td>
                 <td class="cell-st-due">
-                  <input type="date" :value="subtaskDueDateValue(st)" @change="updateSubtaskDueDate(st, $event.target.value)" class="st-date-input">
+                  <input type="date" v-model="st.dueDateInput" @change="updateSubtaskDueDate(st, st.dueDateInput)" class="st-date-input" @keyup.enter="$event.target.blur()">
                 </td>
                 <td class="cell-st-del">
                   <button class="st-del-btn" @click.stop="removeSubtaskInline(idx)" v-html="icons.delete"></button>
@@ -285,9 +285,11 @@
         </div>
 
         <div class="chip-popover-actions">
-          <button class="btn-secondary" @click="closeSubtaskEditor" type="button">Cancel</button>
           <button class="btn-danger" @click="confirmDeleteAllSubtasks(subtaskEditParentTask)" type="button" v-if="subtaskEditForm.length">Delete All</button>
-          <button class="btn-primary" @click="saveSubtaskEdit(subtaskEditParentTask)" type="button">Save</button>
+          <div class="chip-popover-actions-right">
+            <button class="btn-secondary" @click="closeSubtaskEditor" type="button">Cancel</button>
+            <button class="btn-primary" @click="saveSubtaskEdit(subtaskEditParentTask)" type="button">Save</button>
+          </div>
         </div>
       </div>
     </div>
@@ -449,7 +451,7 @@
             <div class="recurrence-options recurrence-options-nested" v-if="repeatForm.endCondition === 'date'">
               <div class="form-group form-group-last">
                 <label>End Date</label>
-                <input type="date" v-model="repeatForm.endDate">
+                <input type="date" v-model="repeatForm.endDate" @keyup.enter="saveRepeatTask">
               </div>
             </div>
           </div>
@@ -610,6 +612,10 @@
             <div class="settings-toggle-list">
               <button class="btn-toggle" :class="{active: trackInProgress}" @click="toggleSetting('trackInProgress')">
                 <span class="toggle-label">Track "In Progress" Status</span>
+                <span class="toggle-track"><span class="toggle-knob"></span></span>
+              </button>
+              <button class="btn-toggle" :class="{active: moveFinishedToEnd}" @click="toggleSetting('moveFinishedToEnd')">
+                <span class="toggle-label">Move Finished Tasks to End</span>
                 <span class="toggle-track"><span class="toggle-knob"></span></span>
               </button>
             </div>
