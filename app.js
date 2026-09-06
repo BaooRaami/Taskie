@@ -46,6 +46,11 @@ const app = createApp({
       toastTimer: null,
       showRepeatAddModal: false,
       repeatTitleError: false,
+      showImportModal: false,
+      importText: '',
+      importHasHeader: false,
+      importColumnMap: [],
+      importPreviewRows: [],
       showConfirmDialog: false,
       confirmMessage: '',
       confirmCallback: null,
@@ -360,6 +365,69 @@ const app = createApp({
       const task = { title, hasDueDate: false, dueDate: null, subtasks: [], status: 'not-started', createdAt: Date.now(), completedAt: null };
       await TaskDB.add(task);
       this.quickAddText = '';
+      await this.loadTasks();
+    },
+
+    // ===== Bulk Import from Pasted Excel Data =====
+    openImportModal() {
+      this.importText = '';
+      this.importHasHeader = false;
+      this.importColumnMap = [];
+      this.importPreviewRows = [];
+      this.showImportModal = true;
+    },
+
+    closeImportModal() {
+      this.showImportModal = false;
+    },
+
+    regenerateImportPreview() {
+      const rows = this.importText.split('\n').map(r => r.replace(/\r$/, '')).filter(r => r.trim().length).map(r => r.split('\t'));
+      const colCount = rows.reduce((max, r) => Math.max(max, r.length), 0);
+      const newMap = [];
+      for (let i = 0; i < colCount; i++) {
+        newMap.push(this.importColumnMap[i] || (i === 0 ? 'name' : 'ignore'));
+      }
+      this.importColumnMap = newMap;
+
+      const dataRows = this.importHasHeader ? rows.slice(1) : rows;
+      const nameIdx = newMap.indexOf('name');
+
+      this.importPreviewRows = dataRows
+        .map(cols => newMap.map((role, colIdx) => {
+          const raw = (cols[colIdx] || '').trim();
+          const cell = { raw, text: raw, dateInput: '', dateFlag: false };
+          if ((role === 'created' || role === 'due') && raw) {
+            const ts = parseDMYDate(raw);
+            if (ts) cell.dateInput = formatDateForInput(new Date(ts));
+            else cell.dateFlag = true;
+          }
+          return cell;
+        }))
+        .filter(row => nameIdx < 0 || (row[nameIdx] && row[nameIdx].text));
+    },
+
+    async confirmImportTasks() {
+      const nameIdx = this.importColumnMap.indexOf('name');
+      const createdIdx = this.importColumnMap.indexOf('created');
+      const dueIdx = this.importColumnMap.indexOf('due');
+      for (const row of this.importPreviewRows) {
+        const title = nameIdx >= 0 ? row[nameIdx].text.trim() : '';
+        if (!title) continue;
+        const dueInput = dueIdx >= 0 ? row[dueIdx].dateInput : '';
+        const createdInput = createdIdx >= 0 ? row[createdIdx].dateInput : '';
+        const task = {
+          title,
+          hasDueDate: !!dueInput,
+          dueDate: dueInput ? parseInputDate(dueInput) : null,
+          subtasks: [],
+          status: 'not-started',
+          createdAt: createdInput ? parseInputDate(createdInput) : Date.now(),
+          completedAt: null
+        };
+        await TaskDB.add(task);
+      }
+      this.closeImportModal();
       await this.loadTasks();
     },
 
@@ -684,7 +752,8 @@ const app = createApp({
           id: Date.now() + Math.random(),
           text: text,
           done: false,
-          dueDate: this.newSubtaskDueDate ? parseInputDate(this.newSubtaskDueDate) : null
+          dueDate: this.newSubtaskDueDate ? parseInputDate(this.newSubtaskDueDate) : null,
+          dueDateInput: this.newSubtaskDueDate || ''
         });
         this.newSubtaskText = '';
         this.newSubtaskDueDate = '';

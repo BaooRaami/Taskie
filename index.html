@@ -6,7 +6,6 @@
   <title>Taskie</title>
   <link rel="stylesheet" href="style.css">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🚩%3C/text%3E%3C/svg%3E">
-  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 </head>
 <body>
   <div id="app">
@@ -122,9 +121,9 @@
             <span class="list-box-count">{{dashboardGroups.custom.length}}</span>
           </div>
           <div class="custom-date-row">
-            <input type="date" v-model="customDateStart" @change="saveCustomDates" @keyup.enter="saveCustomDates">
+            <input type="date" v-model="customDateStart" min="1900-01-01" max="2099-12-31" @change="saveCustomDates" @keyup.enter="saveCustomDates">
             <span>to</span>
-            <input type="date" v-model="customDateEnd" @change="saveCustomDates" @keyup.enter="saveCustomDates">
+            <input type="date" v-model="customDateEnd" min="1900-01-01" max="2099-12-31" @change="saveCustomDates" @keyup.enter="saveCustomDates">
           </div>
           <div class="list-box-body">
             <div v-if="!dashboardGroups.custom.length" class="list-empty">No tasks in range</div>
@@ -148,6 +147,9 @@
           <span class="toolbar-icon" v-html="icons.add"></span>
           <input type="text" v-model="quickAddText" placeholder="Type a task and press Enter..." @keyup.enter="quickAdd" @keyup.esc="clearQuickAdd" ref="quickAddInput">
         </div>
+        <button class="btn-secondary import-toolbar-btn" @click="openImportModal" type="button" title="Import from Excel">
+          <span class="modal-btn-icon" v-html="icons.excel"></span>
+        </button>
         <div class="toolbar-search">
           <span class="toolbar-icon" v-html="icons.search"></span>
           <input type="text" v-model="searchQuery" placeholder="Search tasks..." ref="searchInput">
@@ -184,7 +186,7 @@
                 <div v-if="isCreatedEditing(task.id)" class="chip-popover" @click.stop>
                   <div class="form-group">
                     <label>Created Date</label>
-                    <input type="date" v-model="createdEditValue" @blur="saveCreatedEdit(task)" @keyup.enter="saveCreatedEdit(task)">
+                    <input type="date" v-model="createdEditValue" min="1900-01-01" max="2099-12-31" @blur="saveCreatedEdit(task)" @keyup.enter="saveCreatedEdit(task)">
                   </div>
                 </div>
               </td>
@@ -218,7 +220,7 @@
                   <div class="form-group">
                     <label>Due Date</label>
                     <div class="date-clear-row">
-                      <input type="date" v-model="dueEditForm.dueDate" @keyup.enter="closeDueEditor">
+                      <input type="date" v-model="dueEditForm.dueDate" min="1900-01-01" max="2099-12-31" @keyup.enter="closeDueEditor">
                       <button class="btn-danger" v-if="dueEditForm.dueDate" @click="clearDueDate(task)" type="button">Clear</button>
                     </div>
                   </div>
@@ -244,7 +246,7 @@
       <div v-if="subtaskEditingId !== null" class="chip-popover chip-popover-wide" @click.stop>
         <div class="subtask-add-header">
           <input type="text" v-model="newSubtaskText" @keyup.enter="addSubtaskInline" placeholder="New subtask..." class="subtask-add-input">
-          <input type="date" v-model="newSubtaskDueDate" class="subtask-add-date" @keyup.enter="$event.target.blur(); addSubtaskInline()">
+          <input type="date" v-model="newSubtaskDueDate" min="1900-01-01" max="2099-12-31" class="subtask-add-date" @keyup.enter="newSubtaskDueDate = $event.target.value; addSubtaskInline(); $event.target.blur()">
           <button class="btn-add-subtask" @click="addSubtaskInline" type="button">Add</button>
         </div>
 
@@ -271,7 +273,7 @@
                   <input v-else v-model="subtaskEditValue" @blur="saveSubtaskEditInline" @keyup.enter="saveSubtaskEditInline" @keyup.esc="cancelSubtaskEdit" class="st-inline-input" ref="subtaskEditInput" @click.stop>
                 </td>
                 <td class="cell-st-due">
-                  <input type="date" v-model="st.dueDateInput" @change="updateSubtaskDueDate(st, st.dueDateInput)" class="st-date-input" @keyup.enter="$event.target.blur()">
+                  <input type="date" v-model="st.dueDateInput" min="1900-01-01" max="2099-12-31" @change="updateSubtaskDueDate(st, st.dueDateInput)" class="st-date-input" @keyup.enter="$event.target.blur()">
                 </td>
                 <td class="cell-st-del">
                   <button class="st-del-btn" @click.stop="removeSubtaskInline(idx)" v-html="icons.delete"></button>
@@ -331,7 +333,7 @@
                 <div v-if="isCreatedEditing(item.id)" class="chip-popover" @click.stop>
                   <div class="form-group">
                     <label>Created Date</label>
-                    <input type="date" v-model="createdEditValue" @blur="saveCreatedEdit(item)">
+                    <input type="date" v-model="createdEditValue" min="1900-01-01" max="2099-12-31" @blur="saveCreatedEdit(item)">
                   </div>
                 </div>
               </td>
@@ -451,7 +453,7 @@
             <div class="recurrence-options recurrence-options-nested" v-if="repeatForm.endCondition === 'date'">
               <div class="form-group form-group-last">
                 <label>End Date</label>
-                <input type="date" v-model="repeatForm.endDate" @keyup.enter="saveRepeatTask">
+                <input type="date" v-model="repeatForm.endDate" min="1900-01-01" max="2099-12-31" @keyup.enter="saveRepeatTask">
               </div>
             </div>
           </div>
@@ -471,6 +473,64 @@
               <div v-if="!previewDates.length" class="preview-empty">No dates to preview</div>
               <div v-if="previewDates.length > 7" class="preview-more">...</div>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bulk Import Modal -->
+    <div v-if="showImportModal" class="modal-backdrop" @click="closeImportModal">
+      <div class="modal-panel modal-panel-split import-modal-panel" @click.stop>
+        <div class="modal-left import-modal-left">
+          <h3 class="modal-title">Import Tasks from Excel</h3>
+
+          <div class="form-group">
+            <label>Paste Data</label>
+            <textarea v-model="importText" @input="regenerateImportPreview" placeholder="Paste rows copied from Excel here..." rows="10"></textarea>
+          </div>
+
+          <div class="form-group">
+            <div class="instance-check-label">
+              <input type="checkbox" v-model="importHasHeader" @change="regenerateImportPreview">
+              <span class="instance-text">Data has header row</span>
+            </div>
+          </div>
+
+          <div class="import-found-label" v-if="importPreviewRows.length">Found {{ importPreviewRows.length }} Tasks</div>
+          <div class="chip-popover-actions">
+            <button class="btn-secondary" @click="closeImportModal" type="button">Cancel</button>
+            <button class="btn-primary" @click="confirmImportTasks" type="button" :disabled="!importPreviewRows.length || importPreviewRows.some(row => row.some(cell => cell.dateFlag))">Import</button>
+          </div>
+        </div>
+        <div class="modal-right import-preview-panel">
+          <h4 class="modal-subtitle">Preview</h4>
+          <div class="import-grid-wrap">
+            <table class="import-grid-table">
+              <thead>
+                <tr>
+                  <th v-for="(role, colIdx) in importColumnMap" :key="colIdx" :class="{ 'import-col-ignore': role === 'ignore' }">
+                    <select v-model="importColumnMap[colIdx]" @change="regenerateImportPreview">
+                      <option value="ignore">Ignore</option>
+                      <option value="name">Task Name</option>
+                      <option value="created">Created Date</option>
+                      <option value="due">Due Date</option>
+                    </select>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row, rowIdx) in importPreviewRows" :key="rowIdx">
+                  <td v-for="(cell, colIdx) in row" :key="colIdx" :class="{ 'import-col-ignore': importColumnMap[colIdx] === 'ignore' }">
+                    <input v-if="importColumnMap[colIdx] === 'name'" type="text" v-model="cell.text">
+                    <input v-else-if="importColumnMap[colIdx] === 'created' || importColumnMap[colIdx] === 'due'" type="date" v-model="cell.dateInput" :class="{ 'input-error': cell.dateFlag }" @change="cell.dateFlag = false">
+                    <span v-else class="import-cell-raw">{{ cell.raw }}</span>
+                  </td>
+                </tr>
+                <tr v-if="!importPreviewRows.length">
+                  <td :colspan="importColumnMap.length || 1" class="preview-empty">Paste data to see a preview</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -646,6 +706,7 @@
     </div>
   </div>
   
+  <script src="vue.global.prod.js"></script>
   <script src="helpers.js"></script>
   <script src="app.js"></script>
 </body>

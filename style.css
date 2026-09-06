@@ -515,6 +515,23 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxyge
 .preview-empty { color: var(--text-muted); font-size: 12px; text-align: center; padding: 12px; }
 .preview-more { text-align: center; color: var(--text-muted); font-size: 14px; padding: 4px; }
 
+/* ===== Bulk Import ===== */
+.import-toolbar-btn { display: flex; align-items: center; gap: 6px; }
+.import-modal-panel { width: 1400px; max-width: 96vw; }
+.import-modal-left { flex: none; width: 220px; padding-right: 20px; }
+.import-found-label { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+.import-preview-panel { flex: 1; width: auto; min-width: 0; }
+.import-grid-wrap { overflow: auto; max-height: 460px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.import-grid-table { border-collapse: collapse; width: max-content; }
+.import-grid-table th, .import-grid-table td { border: 1px solid var(--border); padding: 6px 8px; text-align: left; vertical-align: middle; }
+.import-grid-table thead th { background: var(--surface-elevated); position: sticky; top: 0; z-index: 1; }
+.import-grid-table th select { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 5px 6px; border-radius: var(--radius-sm); font-size: 12px; outline: none; font-family: inherit; }
+.import-grid-table td input[type="text"], .import-grid-table td input[type="date"] { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 5px 6px; border-radius: var(--radius-sm); font-size: 12px; outline: none; font-family: inherit; width: 150px; }
+.import-grid-table td input.input-error { border-color: var(--danger); }
+.import-cell-raw { color: var(--text-muted); font-size: 12px; white-space: nowrap; }
+.import-col-ignore { background: var(--bg); opacity: 0.55; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
 /* ===== Instances Popover ===== */
 .instance-form-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; max-height: 260px; overflow-y: auto; padding-right: 4px; }
 .instance-form-list::-webkit-scrollbar { width: 4px; }
