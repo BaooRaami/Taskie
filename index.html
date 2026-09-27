@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="style.css">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🚩%3C/text%3E%3C/svg%3E">
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <base target="_blank">
 </head>
 <body>
   <div id="app">
@@ -255,6 +256,7 @@
           <table class="subtask-table">
             <thead>
               <tr>
+                <th class="col-st-drag"></th>
                 <th class="col-st-done"></th>
                 <th class="col-st-text">Subtask</th>
                 <th class="col-st-due">Due Date</th>
@@ -262,7 +264,10 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(st, idx) in subtaskEditForm" :key="st.id">
+              <tr v-for="(st, idx) in subtaskEditForm" :key="st.id" :class="{ 'st-dragging': draggedSubtaskIndex === idx, 'st-drag-over-top': dragOverSubtaskIndex === idx && !dragOverAfter && draggedSubtaskIndex !== idx, 'st-drag-over-bottom': dragOverSubtaskIndex === idx && dragOverAfter && draggedSubtaskIndex !== idx }" @dragover.prevent="onSubtaskDragOver($event, idx)" @drop="onSubtaskDrop">
+                <td class="cell-st-drag">
+                  <span class="st-drag-handle" draggable="true" @dragstart="onSubtaskDragStart($event, idx)" @dragend="onSubtaskDragEnd" v-html="icons.drag"></span>
+                </td>
                 <td class="cell-st-done">
                   <label class="st-checkbox">
                     <input type="checkbox" v-model="st.done" @click.stop>
@@ -281,7 +286,7 @@
                 </td>
               </tr>
               <tr v-if="!subtaskEditForm.length">
-                <td colspan="4" class="subtask-empty">No subtasks yet. Add one above.</td>
+                <td colspan="5" class="subtask-empty">No subtasks yet. Add one above.</td>
               </tr>
             </tbody>
           </table>
@@ -570,28 +575,28 @@
             <div class="theme-grid">
               <div class="theme-row-primary">
                 <button
-                  v-for="t in themes.slice(0, 2)"
-                  :key="t.key"
+                  v-for="m in modes"
+                  :key="m.key"
                   type="button"
                   class="theme-swatch"
-                  :class="{active: currentTheme === t.key}"
-                  @click="setTheme(t.key)"
+                  :class="{active: currentMode === m.key}"
+                  @click="setMode(m.key)"
                 >
-                  <span class="theme-swatch-preview" :class="'theme-preview-' + t.key"></span>
-                  <span class="theme-swatch-name">{{ t.name }}</span>
+                  <span class="theme-swatch-preview" :class="'theme-preview-' + m.key"></span>
+                  <span class="theme-swatch-name">{{ m.name }}</span>
                 </button>
               </div>
               <div class="theme-row-secondary">
                 <button
-                  v-for="t in themes.slice(2)"
-                  :key="t.key"
+                  v-for="a in accents"
+                  :key="a.key"
                   type="button"
                   class="theme-swatch"
-                  :class="{active: currentTheme === t.key}"
-                  @click="setTheme(t.key)"
+                  :class="{active: currentAccent === a.key}"
+                  @click="setAccent(a.key)"
                 >
-                  <span class="theme-swatch-preview" :class="'theme-preview-' + t.key"></span>
-                  <span class="theme-swatch-name">{{ t.name }}</span>
+                  <span class="theme-swatch-preview" :class="'theme-preview-' + a.key"></span>
+                  <span class="theme-swatch-name">{{ a.name }}</span>
                 </button>
               </div>
             </div>
@@ -679,6 +684,10 @@
                 <span class="toggle-label">Move Finished Tasks to End</span>
                 <span class="toggle-track"><span class="toggle-knob"></span></span>
               </button>
+              <div class="settings-number-row">
+                <span class="toggle-label">Maximum Instances</span>
+                <input type="number" class="settings-number-input" v-model.number="maxInstances" min="7" @change="updateMaxInstances">
+              </div>
             </div>
           </div>
 
@@ -707,6 +716,7 @@
     </div>
   </div>
   
+  <script src="vue.global.prod.js"></script>
   <script src="helpers.js"></script>
   <script src="app.js"></script>
 </body>

@@ -126,6 +126,7 @@ const icons = Object.fromEntries(Object.entries({
   palette: "M480-80q-82 0-155-31.5t-127.5-86Q143-252 111.5-325T80-480q0-83 32.5-155.5t88-127Q256-817 328-848.5T480-880q80 0 151 27.5t124.5 76q53.5 48.5 85 115T872-508q0 100-59.5 156T650-296h-72q-11 0-15.5 7t-4.5 15q0 16 20 42t20 62q0 42-25 65t-93 23Zm-260-320q26 0 43-17t17-43q0-26-17-43t-43-17q-26 0-43 17t-17 43q0 26 17 43t43 17Zm140-160q26 0 43-17t17-43q0-26-17-43t-43-17q-26 0-43 17t-17 43q0 26 17 43t43 17Zm200 0q26 0 43-17t17-43q0-26-17-43t-43-17q-26 0-43 17t-17 43q0 26 17 43t43 17Zm140 160q26 0 43-17t17-43q0-26-17-43t-43-17q-26 0-43 17t-17 43q0 26 17 43t43 17ZM480-160q17 0 28.5-11.5T520-200q0-17-11.5-28.5T480-240q-17 0-28.5 11.5T440-200q0 17 11.5 28.5T480-160Z",
   keyboard: "M160-200q-33 0-56.5-23.5T80-280v-400q0-33 23.5-56.5T160-760h640q33 0 56.5 23.5T880-680v400q0 33-23.5 56.5T800-200H160Zm0-80h640v-400H160v400Zm120-40h400v-80H280v80ZM200-440h80v-80h-80v80Zm120 0h80v-80h-80v80Zm120 0h80v-80h-80v80Zm120 0h80v-80h-80v80Zm120 0h80v-80h-80v80ZM200-560h80v-80h-80v80Zm120 0h80v-80h-80v80Zm120 0h80v-80h-80v80Zm120 0h80v-80h-80v80Zm120 0h80v-80h-80v80Z",
   excel: "M200-440h240v-160H200v160Zm0-240h560v-80H200v80Zm0 560q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v252q-19-8-39.5-10.5t-40.5.5q-21 4-40.5 13.5T684-479l-39 39-205 204v116H200Zm0-80h240v-160H200v160Zm320-240h125l39-39q16-16 35.5-25.5T760-518v-82H520v160Zm0 360v-123l221-220q9-9 20-13t22-4q12 0 23 4.5t20 13.5l37 37q8 9 12.5 20t4.5 22q0 11-4 22.5T863-300L643-80H520Zm300-263-37-37 37 37ZM580-140h38l121-122-37-37-122 121v38Zm141-141-19-18 37 37-18-19Z",
+  drag: "M360-160v-80h80v80h-80Zm160 0v-80h80v80h-80ZM360-400v-80h80v80h-80Zm160 0v-80h80v80h-80ZM360-640v-80h80v80h-80Zm160 0v-80h80v80h-80Z",
 
 }).map(([k, d]) => [k, svg(d)]));
 
@@ -320,6 +321,15 @@ function getRepeatInstanceWindow(repeatTask, uncompletedCount) {
   return instances;
 }
 
+const REPEAT_PENDING_WINDOW = 7;
+
+function pruneCompletedDates(repeatTask, maxInstances) {
+  if (!repeatTask.completedDates || !repeatTask.completedDates.length) return;
+  const finishedCap = Math.max(0, (maxInstances || 20) - REPEAT_PENDING_WINDOW);
+  if (repeatTask.completedDates.length <= finishedCap) return;
+  repeatTask.completedDates = repeatTask.completedDates.slice().sort().slice(repeatTask.completedDates.length - finishedCap);
+}
+
 // ===== Display / Label Formatting =====
 function formatFrequency(item) {
   if (item.mode === 'days') {
@@ -382,7 +392,8 @@ function subtaskChipLabel(task) {
 function instanceChipLabel(item) {
   const window = getRepeatInstanceWindow(item, 7);
   const totalCompleted = (item.completedDates || []).length;
-  return `${totalCompleted} / ${window.length} Done`;
+  const pending = window.filter(inst => !inst.checked).length;
+  return `${totalCompleted} / ${totalCompleted + pending} Done`;
 }
 
 function statusLabel(status) {

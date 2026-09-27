@@ -31,6 +31,9 @@ const app = createApp({
       subtaskJustSaved: false,
       newSubtaskDueDate: '',
       subtaskEditParentTask: null,
+      draggedSubtaskIndex: null,
+      dragOverSubtaskIndex: null,
+      dragOverAfter: false,
       customDateStart: '',
       customDateEnd: '',
       dashboardSections: [
@@ -59,10 +62,15 @@ const app = createApp({
       hideCustomList: false,
       trackInProgress: true,
       moveFinishedToEnd: false,
-      currentTheme: 'dark',
-      themes: [
+      maxInstances: 20,
+      currentMode: 'dark',
+      currentAccent: 'twilight',
+      modes: [
         { key: 'dark', name: 'Dark' },
-        { key: 'light', name: 'Light' },
+        { key: 'light', name: 'Light' }
+      ],
+      accents: [
+        { key: 'twilight', name: 'Twilight' },
         { key: 'ocean', name: 'Ocean' },
         { key: 'forest', name: 'Forest' },
         { key: 'sunset', name: 'Sunset' }
@@ -304,14 +312,19 @@ const app = createApp({
       const hc = localStorage.getItem('taskyHideCustom');
       const tip = localStorage.getItem('taskyTrackInProgress');
       const cbd = localStorage.getItem('taskyConfirmBeforeDelete');
-      const theme = localStorage.getItem('taskyTheme');
+      const mode = localStorage.getItem('taskyMode');
+      const accent = localStorage.getItem('taskyAccent');
       this.hideEmptyLists = he === 'true';
       this.hideCustomList = hc === 'true';
       this.trackInProgress = tip !== 'false';
       this.confirmBeforeDelete = cbd !== 'false';
       this.moveFinishedToEnd = localStorage.getItem('taskyMoveFinishedToEnd') === 'true';
-      this.currentTheme = theme || 'dark';
-      document.documentElement.setAttribute('data-theme', this.currentTheme);
+      const mi = parseInt(localStorage.getItem('taskyMaxInstances'), 10);
+      this.maxInstances = isNaN(mi) ? 20 : mi;
+      this.currentMode = mode || 'dark';
+      this.currentAccent = accent || 'twilight';
+      document.documentElement.setAttribute('data-mode', this.currentMode);
+      document.documentElement.setAttribute('data-accent', this.currentAccent);
     },
 
     saveSettings() {
@@ -320,14 +333,37 @@ const app = createApp({
       localStorage.setItem('taskyTrackInProgress', this.trackInProgress);
       localStorage.setItem('taskyConfirmBeforeDelete', this.confirmBeforeDelete);
       localStorage.setItem('taskyMoveFinishedToEnd', this.moveFinishedToEnd);
-      localStorage.setItem('taskyTheme', this.currentTheme);
+      localStorage.setItem('taskyMaxInstances', this.maxInstances);
+      localStorage.setItem('taskyMode', this.currentMode);
+      localStorage.setItem('taskyAccent', this.currentAccent);
     },
 
     toggleSetting(key) { this[key] = !this[key]; this.saveSettings(); },
 
-    setTheme(theme) {
-      this.currentTheme = theme;
-      document.documentElement.setAttribute('data-theme', theme);
+    updateMaxInstances() {
+      let val = parseInt(this.maxInstances, 10);
+      if (isNaN(val) || val < 7) val = 7;
+      this.maxInstances = val;
+      this.saveSettings();
+      this.pruneAllRepeatTasks();
+    },
+
+    pruneAllRepeatTasks() {
+      for (const rt of this.repeatTasks) {
+        pruneCompletedDates(rt, this.maxInstances);
+      }
+      this.saveRepeatTasksToDB();
+    },
+
+    setMode(mode) {
+      this.currentMode = mode;
+      document.documentElement.setAttribute('data-mode', mode);
+      this.saveSettings();
+    },
+
+    setAccent(accent) {
+      this.currentAccent = accent;
+      document.documentElement.setAttribute('data-accent', accent);
       this.saveSettings();
     },
 
@@ -524,6 +560,7 @@ const app = createApp({
     async loadRepeatTasksFromDB() {
       if (window.dbHelper && window.dbHelper.getRepeatTasks) {
         this.repeatTasks = await window.dbHelper.getRepeatTasks() || [];
+        this.pruneAllRepeatTasks();
       }
     },
 
@@ -574,6 +611,7 @@ const app = createApp({
       const idx = repeatTask.completedDates.indexOf(inst.repeatInstanceDate);
       if (idx === -1) {
         repeatTask.completedDates.push(inst.repeatInstanceDate);
+        pruneCompletedDates(repeatTask, this.maxInstances);
       } else {
         repeatTask.completedDates.splice(idx, 1);
       }
@@ -742,6 +780,9 @@ const app = createApp({
       this.subtaskEditForm = [];
       this.newSubtaskText = '';
       this.newSubtaskDueDate = '';
+      this.draggedSubtaskIndex = null;
+      this.dragOverSubtaskIndex = null;
+      this.dragOverAfter = false;
     },
 
     addSubtaskInline() {
@@ -761,6 +802,35 @@ const app = createApp({
     },
 
     removeSubtaskInline(index) { this.subtaskEditForm.splice(index, 1); },
+
+    onSubtaskDragStart(event, idx) {
+      this.draggedSubtaskIndex = idx;
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', String(idx));
+    },
+
+    onSubtaskDragOver(event, idx) {
+      const rect = event.currentTarget.getBoundingClientRect();
+      this.dragOverAfter = (event.clientY - rect.top) > rect.height / 2;
+      this.dragOverSubtaskIndex = idx;
+    },
+
+    onSubtaskDrop() {
+      const from = this.draggedSubtaskIndex;
+      const hoverIdx = this.dragOverSubtaskIndex;
+      if (from === null || hoverIdx === null) { this.onSubtaskDragEnd(); return; }
+      let target = hoverIdx + (this.dragOverAfter ? 1 : 0);
+      if (target > from) target -= 1;
+      const moved = this.subtaskEditForm.splice(from, 1)[0];
+      this.subtaskEditForm.splice(target, 0, moved);
+      this.onSubtaskDragEnd();
+    },
+
+    onSubtaskDragEnd() {
+      this.draggedSubtaskIndex = null;
+      this.dragOverSubtaskIndex = null;
+      this.dragOverAfter = false;
+    },
 
     confirmDeleteAllSubtasks(task) {
       const t = task || this.subtaskEditParentTask;
@@ -807,7 +877,7 @@ const app = createApp({
     async saveSubtaskEdit(task) {
       const t = task || this.subtaskEditParentTask;
       if (!t) return;
-      t.subtasks = this.subtaskEditForm;
+      t.subtasks = this.subtaskEditForm.map(st => { const { dueDateInput, ...rest } = st; return rest; });
       const allDone = t.subtasks.every(s => s.done);
       if (allDone && t.status !== 'finished') {
         t.status = 'finished';
@@ -934,6 +1004,7 @@ const app = createApp({
           if (!repeatTask.completedDates) repeatTask.completedDates = [];
           if (!repeatTask.completedDates.includes(task.repeatInstanceDate)) {
             repeatTask.completedDates.push(task.repeatInstanceDate);
+            pruneCompletedDates(repeatTask, this.maxInstances);
           }
           this.saveRepeatTasksToDB();
           delete this.slidingTaskIds[task.id];
@@ -949,8 +1020,8 @@ const app = createApp({
 
     // ===== Import / Export =====
     exportJSON() {
-      const data = { app: 'Taskie', version: 1, exportedAt: new Date().toISOString(), tasks: this.tasks.map(t => { const { reminders, ...rest } = t; return rest; }), repeatTasks: this.repeatTasks };
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const data = { app: 'Taskie', version: 1, exportedAt: new Date().toISOString(), tasks: this.tasks.map(t => { const { reminders, ...rest } = t; rest.subtasks = (rest.subtasks || []).map(st => { const { dueDateInput, ...stRest } = st; return stRest; }); return rest; }), repeatTasks: this.repeatTasks };
+      const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -976,7 +1047,7 @@ const app = createApp({
                   ...rt,
                   completedDates: rt.completedDates || []
                 }));
-                this.saveRepeatTasksToDB();
+                this.pruneAllRepeatTasks();
               }
               await this.loadTasks();
               this.page = 'dashboard';
@@ -1095,7 +1166,17 @@ const app = createApp({
           this.clearSearch();
           return;
         }
+        if (this.showImportModal) { this.closeImportModal(); return; }
+        if (this.showRepeatAddModal) { this.closeRepeatAddModal(); return; }
         this.closeAllEditors();
+      }
+      if (e.key === 'Enter' && this.subtaskEditingId !== null) {
+        const active = document.activeElement;
+        const isTyping = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') && active.closest('.chip-popover-wide');
+        if (!isTyping) {
+          e.preventDefault();
+          this.saveSubtaskEdit(this.subtaskEditParentTask);
+        }
       }
     };
     document.addEventListener('keydown', this._keydownHandler);
