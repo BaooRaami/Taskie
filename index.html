@@ -634,36 +634,26 @@
         </div>
 
         <div class="settings-cards-row">
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <span class="settings-card-icon" v-html="icons.export"></span>
-              <div class="settings-card-heading">
-                <span class="settings-card-title">Data Management</span>
-                <span class="settings-card-sub">Backup or restore your tasks</span>
-              </div>
-            </div>
-            <div class="settings-btn-row">
-              <button class="btn-secondary" @click="exportJSON">
-                <span class="modal-btn-icon" v-html="icons.export"></span> Export
-              </button>
-              <label class="btn-secondary btn-file-label">
-                <span class="modal-btn-icon" v-html="icons.import"></span> Import
-                <input type="file" accept=".json" @change="importJSON" hidden>
-              </label>
-            </div>
-          </div>
 
           <div class="settings-card">
             <div class="settings-card-header">
-              <span class="settings-card-icon" v-html="icons.settings"></span>
+              <span class="settings-card-icon" v-html="icons.dashboard"></span>
               <div class="settings-card-heading">
-                <span class="settings-card-title">Interface</span>
-                <span class="settings-card-sub">General behavior</span>
+                <span class="settings-card-title">Dashboard</span>
+                <span class="settings-card-sub">What shows on your home screen</span>
               </div>
             </div>
             <div class="settings-toggle-list">
-              <button class="btn-toggle" :class="{active: confirmBeforeDelete}" @click="toggleSetting('confirmBeforeDelete')">
-                <span class="toggle-label">Confirm before Task Delete</span>
+              <button class="btn-toggle" :class="{active: hideEmptyLists}" @click="toggleSetting('hideEmptyLists')">
+                <span class="toggle-label">Hide Empty Lists</span>
+                <span class="toggle-track"><span class="toggle-knob"></span></span>
+              </button>
+              <button class="btn-toggle" :class="{active: hideCustomList}" @click="toggleSetting('hideCustomList')">
+                <span class="toggle-label">Hide Custom List</span>
+                <span class="toggle-track"><span class="toggle-knob"></span></span>
+              </button>
+              <button class="btn-toggle" :class="{active: showTomorrowLabel}" @click="toggleSetting('showTomorrowLabel')">
+                <span class="toggle-label">Have "Tomorrow" Label</span>
                 <span class="toggle-track"><span class="toggle-knob"></span></span>
               </button>
             </div>
@@ -695,25 +685,36 @@
 
           <div class="settings-card">
             <div class="settings-card-header">
-              <span class="settings-card-icon" v-html="icons.dashboard"></span>
+              <span class="settings-card-icon" v-html="icons.settings"></span>
               <div class="settings-card-heading">
-                <span class="settings-card-title">Dashboard</span>
-                <span class="settings-card-sub">What shows on your home screen</span>
+                <span class="settings-card-title">Interface</span>
+                <span class="settings-card-sub">General behavior</span>
               </div>
             </div>
             <div class="settings-toggle-list">
-              <button class="btn-toggle" :class="{active: hideEmptyLists}" @click="toggleSetting('hideEmptyLists')">
-                <span class="toggle-label">Hide Empty Lists</span>
+              <button class="btn-toggle" :class="{active: confirmBeforeDelete}" @click="toggleSetting('confirmBeforeDelete')">
+                <span class="toggle-label">Confirm before Task Delete</span>
                 <span class="toggle-track"><span class="toggle-knob"></span></span>
               </button>
-              <button class="btn-toggle" :class="{active: hideCustomList}" @click="toggleSetting('hideCustomList')">
-                <span class="toggle-label">Hide Custom List</span>
-                <span class="toggle-track"><span class="toggle-knob"></span></span>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-card-icon" v-html="icons.export"></span>
+              <div class="settings-card-heading">
+                <span class="settings-card-title">Data Management</span>
+                <span class="settings-card-sub">Backup or restore your tasks</span>
+              </div>
+            </div>
+            <div class="settings-btn-row">
+              <button class="btn-secondary" @click="exportJSON">
+                <span class="modal-btn-icon" v-html="icons.export"></span> Export
               </button>
-              <button class="btn-toggle" :class="{active: showTomorrowLabel}" @click="toggleSetting('showTomorrowLabel')">
-                <span class="toggle-label">Have "Tomorrow" Label</span>
-                <span class="toggle-track"><span class="toggle-knob"></span></span>
-              </button>
+              <label class="btn-secondary btn-file-label">
+                <span class="modal-btn-icon" v-html="icons.import"></span> Import
+                <input type="file" accept=".json" @change="importJSON" hidden>
+              </label>
             </div>
           </div>
         </div>
