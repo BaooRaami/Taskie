@@ -60,6 +60,7 @@ const app = createApp({
       confirmBeforeDelete: true,
       hideEmptyLists: false,
       hideCustomList: false,
+      showTomorrowLabel: false,
       trackInProgress: true,
       moveFinishedToEnd: false,
       maxInstances: 20,
@@ -238,6 +239,7 @@ const app = createApp({
       for (const repeatTask of this.repeatTasks) {
         if (q && !repeatTask.title.toLowerCase().includes(q)) continue;
         const completed = repeatTask.completedDates || [];
+        for (const inst of getOverdueRepeatInstances(repeatTask)) classify(inst, inst.dueDate);
         const instances = getRepeatInstances(repeatTask, 7);
         for (const inst of instances) {
           const dateStr = formatDateForInput(new Date(inst.dueDate));
@@ -316,6 +318,7 @@ const app = createApp({
       const accent = localStorage.getItem('taskyAccent');
       this.hideEmptyLists = he === 'true';
       this.hideCustomList = hc === 'true';
+      this.showTomorrowLabel = localStorage.getItem('taskyShowTomorrow') === 'true';
       this.trackInProgress = tip !== 'false';
       this.confirmBeforeDelete = cbd !== 'false';
       this.moveFinishedToEnd = localStorage.getItem('taskyMoveFinishedToEnd') === 'true';
@@ -330,12 +333,28 @@ const app = createApp({
     saveSettings() {
       localStorage.setItem('taskyHideEmpty', this.hideEmptyLists);
       localStorage.setItem('taskyHideCustom', this.hideCustomList);
+      localStorage.setItem('taskyShowTomorrow', this.showTomorrowLabel);
       localStorage.setItem('taskyTrackInProgress', this.trackInProgress);
       localStorage.setItem('taskyConfirmBeforeDelete', this.confirmBeforeDelete);
       localStorage.setItem('taskyMoveFinishedToEnd', this.moveFinishedToEnd);
       localStorage.setItem('taskyMaxInstances', this.maxInstances);
       localStorage.setItem('taskyMode', this.currentMode);
       localStorage.setItem('taskyAccent', this.currentAccent);
+    },
+
+    dashboardSubGroups(sec) {
+      const tasks = this.dashboardGroups[sec.key];
+      if (sec.key !== 'next7' || !this.showTomorrowLabel) return [{ label: '', tasks }];
+      const tomorrow = new Date();
+      tomorrow.setHours(0, 0, 0, 0);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const isTomorrow = t => { const d = new Date(t.dueDate); d.setHours(0, 0, 0, 0); return d.getTime() === tomorrow.getTime(); };
+      const tomorrowTasks = tasks.filter(isTomorrow);
+      if (!tomorrowTasks.length) return [{ label: '', tasks }];
+      const laterTasks = tasks.filter(t => !isTomorrow(t));
+      const parts = [{ label: 'Tomorrow', tasks: tomorrowTasks }];
+      if (laterTasks.length) parts.push({ label: 'Later', tasks: laterTasks });
+      return parts;
     },
 
     toggleSetting(key) { this[key] = !this[key]; this.saveSettings(); },
@@ -350,6 +369,7 @@ const app = createApp({
 
     pruneAllRepeatTasks() {
       for (const rt of this.repeatTasks) {
+        if (!rt.trackFrom) rt.trackFrom = formatDateForInput(new Date());
         pruneCompletedDates(rt, this.maxInstances);
       }
       this.saveRepeatTasksToDB();
@@ -522,7 +542,8 @@ const app = createApp({
           const existing = this.repeatTasks[index];
           const updated = {
             ...JSON.parse(JSON.stringify(this.repeatForm)),
-            completedDates: existing.completedDates || []
+            completedDates: existing.completedDates || [],
+            trackFrom: formatFrequency(existing) !== formatFrequency(this.repeatForm) ? formatDateForInput(new Date()) : (existing.trackFrom || formatDateForInput(new Date()))
           };
           this.repeatTasks = this.repeatTasks.map((t, i) => i === index ? updated : t);
         }
@@ -531,7 +552,8 @@ const app = createApp({
           ...JSON.parse(JSON.stringify(this.repeatForm)),
           id: Date.now(),
           createdAt: new Date().toISOString().split('T')[0],
-          completedDates: []
+          completedDates: [],
+          trackFrom: formatDateForInput(new Date())
         };
         this.repeatTasks.push(newTask);
       }

@@ -6,8 +6,7 @@
   <title>Taskie</title>
   <link rel="stylesheet" href="style.css">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🚩%3C/text%3E%3C/svg%3E">
-  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-  <base target="_blank">
+<base target="_blank">
 </head>
 <body>
   <div id="app">
@@ -105,13 +104,16 @@
             </div>
             <div class="list-box-body">
               <div v-if="!dashboardGroups[sec.key].length" class="list-empty">{{sec.emptyMsg}}</div>
-              <div v-for="task in dashboardGroups[sec.key]" :key="task.id" :class="['list-task-row', sec.key + '-task', { 'slide-out': slidingTaskIds[task.id], 'repeat-task-row': isRepeatInstance(task) }]" @click="goToTask(task)">
+              <template v-for="grp in dashboardSubGroups(sec)" :key="grp.label">
+              <div v-if="grp.label" class="list-subheader">{{grp.label}}</div>
+              <div v-for="task in grp.tasks" :key="task.id" :class="['list-task-row', sec.key + '-task', { 'slide-out': slidingTaskIds[task.id], 'repeat-task-row': isRepeatInstance(task) }]" @click="goToTask(task)">
                 <input type="checkbox" @click.stop @change="quickFinish(task)">
                 <span class="list-task-title"><span v-if="isRepeatInstance(task)" class="repeat-badge" v-html="icons.repeat" title="Repeat task"></span>{{task.title}}</span>
                 <div v-if="sec.showDate" class="list-task-meta">
                   <span :class="['list-task-date', sec.dateClass]">{{formatDate(task.dueDate)}}</span>
                 </div>
               </div>
+              </template>
             </div>
           </div>
         </template>
@@ -706,6 +708,10 @@
               </button>
               <button class="btn-toggle" :class="{active: hideCustomList}" @click="toggleSetting('hideCustomList')">
                 <span class="toggle-label">Hide Custom List</span>
+                <span class="toggle-track"><span class="toggle-knob"></span></span>
+              </button>
+              <button class="btn-toggle" :class="{active: showTomorrowLabel}" @click="toggleSetting('showTomorrowLabel')">
+                <span class="toggle-label">Have "Tomorrow" Label</span>
                 <span class="toggle-track"><span class="toggle-knob"></span></span>
               </button>
             </div>

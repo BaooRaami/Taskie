@@ -1,5 +1,10 @@
 // Taskie - Helpers (DB + Notifications + Icons + Date Utilities + Recurrence + Label Formatting)
 
+// ===== Vue Fallback (only loads online copy if local vue.global.prod.js is missing) =====
+if (typeof Vue === 'undefined') {
+  document.write('<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"><\/script>');
+}
+
 // ===== IndexedDB =====
 const DB_NAME = 'TaskyDB';
 const DB_VERSION = 2;
@@ -241,7 +246,13 @@ function getNextOccurrence(form, afterTimestamp) {
 function* occurrenceGenerator(form, opts = {}) {
   let last = new Date();
   last.setHours(0, 0, 0, 0);
-  last.setDate(last.getDate() - 1);
+  if (opts.startFrom != null) {
+    last = new Date(opts.startFrom);
+    last.setHours(0, 0, 0, 0);
+    last.setDate(last.getDate() - (form.mode === 'days' ? (form.intervalDays || 1) : 1));
+  } else {
+    last.setDate(last.getDate() - 1);
+  }
   let cycleCount = 0;
   let lastCycleKey = null;
   const maxIterations = opts.maxIterations || 80;
@@ -249,6 +260,7 @@ function* occurrenceGenerator(form, opts = {}) {
   for (let i = 0; i < maxIterations; i++) {
     const next = getNextOccurrence(form, last.getTime());
     if (!next) break;
+    if (opts.until != null && next > opts.until) break;
     if (form.endCondition === 'date' && form.endDate) {
       const end = new Date(form.endDate);
       end.setHours(0, 0, 0, 0);
@@ -322,12 +334,57 @@ function getRepeatInstanceWindow(repeatTask, uncompletedCount) {
 }
 
 const REPEAT_PENDING_WINDOW = 7;
+const REPEAT_OVERDUE_LOOKBACK_DAYS = 30;
 
 function pruneCompletedDates(repeatTask, maxInstances) {
   if (!repeatTask.completedDates || !repeatTask.completedDates.length) return;
   const finishedCap = Math.max(0, (maxInstances || 20) - REPEAT_PENDING_WINDOW);
   if (repeatTask.completedDates.length <= finishedCap) return;
-  repeatTask.completedDates = repeatTask.completedDates.slice().sort().slice(repeatTask.completedDates.length - finishedCap);
+  const sorted = repeatTask.completedDates.slice().sort();
+  const cut = sorted.length - finishedCap;
+  const [y, m, d] = sorted[cut - 1].split('-').map(Number);
+  const floor = formatDateForInput(new Date(y, m - 1, d + 1));
+  if (!repeatTask.trackFrom || floor > repeatTask.trackFrom) repeatTask.trackFrom = floor;
+  repeatTask.completedDates = sorted.slice(cut);
+}
+
+function getOverdueRepeatInstances(repeatTask) {
+  const today = getTodayStart();
+  const trackFrom = repeatTask.trackFrom ? parseInputDate(repeatTask.trackFrom) : null;
+  if (trackFrom === null) return [];
+  const lookback = new Date(today);
+  lookback.setDate(lookback.getDate() - REPEAT_OVERDUE_LOOKBACK_DAYS);
+  let startFrom = Math.max(lookback.getTime(), trackFrom);
+  if (startFrom >= today) return [];
+  if (repeatTask.mode === 'days' && startFrom > trackFrom) {
+    const interval = repeatTask.intervalDays || 1;
+    const daysBetween = Math.round((startFrom - trackFrom) / 86400000);
+    const aligned = new Date(trackFrom);
+    aligned.setDate(aligned.getDate() + Math.ceil(daysBetween / interval) * interval);
+    startFrom = aligned.getTime();
+  }
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const completed = repeatTask.completedDates || [];
+  const instances = [];
+  for (const next of occurrenceGenerator(repeatTask, { startFrom, until: yesterday.getTime(), maxIterations: REPEAT_OVERDUE_LOOKBACK_DAYS + 5 })) {
+    const dateStr = formatDateForInput(new Date(next));
+    if (completed.includes(dateStr)) continue;
+    instances.push({
+      id: 'repeat-' + repeatTask.id + '-' + next,
+      title: repeatTask.title,
+      hasDueDate: true,
+      dueDate: next,
+      status: 'not-started',
+      createdAt: Date.now(),
+      completedAt: null,
+      repeatTaskId: repeatTask.id,
+      repeatInstanceDate: dateStr,
+      subtasks: [],
+      reminders: []
+    });
+  }
+  return instances;
 }
 
 // ===== Display / Label Formatting =====
@@ -406,3 +463,45 @@ function subtaskProgress(task) {
   const done = task.subtasks.filter(s => s.done).length;
   return `${done}/${task.subtasks.length}`;
 }
+
+// ===== Hover Scroll for Long Task Titles (Dashboard Lists) =====
+(function () {
+  let activeTitle = null;
+  let startTimer = null;
+  let rafId = null;
+
+  function stopScroll() {
+    clearTimeout(startTimer);
+    cancelAnimationFrame(rafId);
+    if (activeTitle) { activeTitle.scrollLeft = 0; activeTitle.classList.remove('title-scrolling'); }
+    activeTitle = null;
+  }
+
+  function startScroll(title) {
+    title.classList.add('title-scrolling');
+    const distance = title.scrollWidth - title.clientWidth;
+    if (distance <= 0) return;
+    const duration = Math.min(2500, Math.max(500, distance * 12));
+    const t0 = performance.now();
+    function step(now) {
+      const progress = Math.min(1, (now - t0) / duration);
+      title.scrollLeft = distance * progress;
+      if (progress < 1) rafId = requestAnimationFrame(step);
+    }
+    rafId = requestAnimationFrame(step);
+  }
+
+  document.addEventListener('mouseover', function (e) {
+    const row = e.target.closest ? e.target.closest('.list-task-row') : null;
+    const title = row ? row.querySelector('.list-task-title') : null;
+    if (title === activeTitle) return;
+    stopScroll();
+    if (!title) return;
+    activeTitle = title;
+    startTimer = setTimeout(function () { startScroll(title); }, 300);
+  });
+
+  document.addEventListener('mouseout', function (e) {
+    if (!e.relatedTarget) stopScroll();
+  });
+})();
